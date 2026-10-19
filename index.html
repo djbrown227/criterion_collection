@@ -1,0 +1,1121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Closet</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Montserrat:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #1e1d21; --fg: #f3eadb; --fg-dim: #b8a898; --accent: #f1c7a2; --card: #2a292f; --ink: #1c1620;
+    --display: "Source Serif 4", "Mercury Text G1", Georgia, "Times New Roman", serif;
+    --hand: "Montserrat", "Gotham", "Helvetica Neue", Arial, sans-serif;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; overflow: hidden; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--display); overflow: hidden; user-select: none; -webkit-user-select: none; }
+  #room { position: fixed; inset: 0; }
+  #wall { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+  #wall.grabbing { cursor: grabbing; }
+  #vignette { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 70% 42% at 50% 0%, rgba(255,250,235,.30), transparent 70%), radial-gradient(ellipse 95% 100% at 50% 55%, transparent 60%, rgba(20,18,22,.6) 100%); }
+  #grain { position: absolute; inset: 0; pointer-events: none; opacity: .16; mix-blend-mode: soft-light;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+  #light { position: absolute; inset: 0; background: var(--ink); opacity: 0; pointer-events: none; transition: opacity 1.6s ease-in; }
+
+  #loading { position: absolute; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 40; font-family: var(--hand); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--fg-dim); transition: opacity .6s; }
+  #loading.off { opacity: 0; pointer-events: none; }
+
+  #card { position: absolute; width: 250px; pointer-events: none; opacity: 0; transform: translateY(6px); transition: opacity .18s ease-out, transform .18s ease-out;
+    background: var(--card); border: 2.5px solid var(--ink); border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    box-shadow: 0 18px 40px rgba(28,22,32,.55); padding: 14px; display: grid; gap: 8px; z-index: 5; }
+  #card.on { opacity: 1; transform: translateY(0); }
+  #card .art { width: 100%; aspect-ratio: 2/3; display: block; background: #000; object-fit: cover; border: 2px solid var(--ink); border-radius: 12px 4px 10px 5px / 5px 10px 4px 12px; }
+  #card .t { font-size: 21px; line-height: 1.1; text-wrap: balance; }
+  #card .m { font-family: var(--hand); font-size: 14px; color: var(--fg-dim); line-height: 1.3; }
+  #card .cast { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; row-gap: 2px; font-size: 14px; line-height: 1.25; }
+  #card .cast .a { color: var(--fg); }
+  #card .cast .r { color: var(--fg-dim); font-style: italic; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #card .cr { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; row-gap: 3px; font-family: var(--hand); font-size: 11px; line-height: 1.25; color: var(--fg-dim); border-top: 1px dashed rgba(241,199,162,.25); padding-top: 6px; }
+  #card .cr .k { color: var(--accent); }
+  #card .cr .v { min-width: 0; }
+  #card .p { font-family: var(--hand); font-size: 11.5px; color: var(--accent); line-height: 1.3; border-top: 1px dashed rgba(241,199,162,.35); padding-top: 6px; }
+  #card .p.never { color: var(--fg-dim); }
+
+  #search { position: absolute; left: 50%; top: 18px; transform: translate(-50%, -12px); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 6; }
+  #search.on { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+  #q { background: transparent; border: 0; border-bottom: 1px solid rgba(217,201,163,.4); color: var(--fg); font-family: var(--display); font-size: 28px; width: min(420px, 80vw); padding: 4px 6px; outline: none; text-align: center; }
+  #q:focus { border-bottom-color: var(--accent); }
+  #hint { position: absolute; left: 50%; top: 24px; transform: translateX(-50%); font-family: var(--hand); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-dim); pointer-events: none; transition: opacity .4s; white-space: nowrap; }
+  #hint.off { opacity: 0; }
+
+  #stack { position: absolute; right: 22px; bottom: 22px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; z-index: 6; }
+  #held { position: relative; height: 92px; width: 160px; }
+  .pick { position: absolute; bottom: 0; width: 56px; height: 82px; cursor: pointer; box-shadow: 0 10px 24px rgba(28,22,32,.6); transform-origin: 50% 100%; transition: transform .25s ease-out; border: 2px solid var(--ink); border-radius: 12px 4px 10px 5px / 5px 10px 4px 12px; overflow: hidden; }
+  .pick:hover { transform: translateY(-10px) rotate(0deg) !important; z-index: 9; }
+  .pick canvas { width: 100%; height: 100%; display: block; }
+  .pick .n { position: absolute; left: 0; right: 0; bottom: 0; font-family: var(--hand); font-size: 9px; letter-spacing: .06em; text-align: center; background: rgba(0,0,0,.6); color: var(--accent); padding: 2px 0; }
+  #count { font-family: var(--hand); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-dim); }
+  #count b { color: var(--accent); font-weight: 400; }
+  .fly { position: absolute; pointer-events: none; z-index: 20; box-shadow: 0 10px 30px rgba(0,0,0,.8); }
+
+  #counted { border-top: 2.5px dashed rgba(241,199,162,.3); padding-top: 64px; min-width: 0; }
+  #spinehint { position: absolute; left: 22px; bottom: 22px; font-family: var(--hand); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--fg-dim); pointer-events: none; }
+  #spinehint b { color: var(--accent); font-weight: 400; font-size: 18px; display: block; margin-bottom: 2px; font-family: var(--display); }
+
+  #reveal { position: fixed; inset: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; -ms-overflow-style: none; background: var(--bg); opacity: 0; pointer-events: none; transition: opacity 1.2s ease; z-index: 30; padding: 48px 16px 80px; user-select: text; }
+  #reveal.on { opacity: 1; pointer-events: auto; }
+  #reveal::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  #reveal * { max-width: 100%; }
+  #reveal canvas { box-sizing: border-box; }
+  #reveal .inner { max-width: 780px; margin: 0 auto; display: grid; gap: 72px; min-width: 0; }
+  #reveal h1 { font-weight: 400; font-size: clamp(36px, 6vw, 60px); margin: 0; line-height: 1; text-wrap: balance; text-align: center; }
+  #reveal h2 { font-weight: 400; font-size: 30px; margin: 0 0 6px; line-height: 1.1; text-wrap: balance; }
+  #reveal .lede { margin: 0 0 22px; color: var(--fg-dim); font-size: 17px; font-style: italic; max-width: 56ch; line-height: 1.4; }
+  #reveal .eyebrow { font-family: var(--hand); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); display: inline-block; margin-bottom: 6px; }
+  .cov { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; background: #000; box-shadow: 0 16px 40px rgba(28,22,32,.6); border: 2.5px solid var(--ink); border-radius: 14px 4px 12px 5px / 5px 12px 4px 14px; }
+  /* 1. placed */
+  #placed { display: grid; gap: 18px; }
+  .pl { display: grid; grid-template-columns: 84px 1fr; gap: 18px; align-items: center; }
+  .pl .t { font-size: 22px; line-height: 1.1; }
+  .pl .k { font-family: var(--hand); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-dim); }
+  .pl .who { font-size: 15px; line-height: 1.4; color: var(--fg-dim); margin-top: 4px; }
+  .pl .who b { color: var(--accent); font-weight: 400; }
+  .pl .first { font-family: var(--hand); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-top: 6px; }
+  /* 2. twins */
+  #twins { display: grid; gap: 14px; }
+  .tw { display: grid; grid-template-columns: 56px 1fr; gap: 16px; padding: 16px 18px; border: 2.5px solid var(--ink); border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; background: var(--card); }
+  .tw .rank { font-family: var(--display); font-size: 34px; color: var(--accent); line-height: 1; }
+  .tw .n { font-size: 24px; line-height: 1.1; }
+  .tw .d { font-family: var(--hand); font-size: 10.5px; letter-spacing: .04em; color: var(--fg-dim); margin-top: 2px; }
+  .tw .shelf { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .tw .chip { font-size: 13px; line-height: 1.2; padding: 3px 8px; border-radius: 10px 4px 9px 5px / 5px 9px 4px 10px; border: 1.5px solid rgba(243,234,219,.18); color: var(--fg-dim); }
+  .tw .chip.hit { border-color: var(--accent); color: var(--accent); background: rgba(241,199,162,.08); }
+  /* 3. map */
+  #map { width: 100%; height: 440px; display: block; border: 2.5px solid var(--ink); border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; background: var(--card); }
+  #mapnote { font-family: var(--hand); font-size: 12px; color: var(--fg-dim); margin-top: 8px; }
+  /* 4. numbers */
+  #nums { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+  .num { padding: 16px 18px; border: 2.5px solid var(--ink); border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; background: var(--card); }
+  .num .v { font-size: 40px; line-height: 1; }
+  .num .l { font-family: var(--hand); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 6px 0 8px; }
+  .num .c { font-size: 14px; line-height: 1.35; color: var(--fg-dim); }
+  .bar { position: relative; height: 6px; background: rgba(243,234,219,.12); border-radius: 3px; margin-top: 10px; }
+  .bar i { position: absolute; top: -4px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid var(--ink); transform: translateX(-50%); }
+  .bar b { position: absolute; top: -2px; width: 2px; height: 10px; background: var(--fg-dim); transform: translateX(-50%); }
+  /* 5. also */
+  #also { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 16px; }
+  .al .t { font-size: 15px; line-height: 1.15; margin-top: 8px; }
+  .al .k { font-family: var(--hand); font-size: 12px; color: var(--fg-dim); }
+  #five { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  #five .c { width: 92px; }
+  #five .k { font-family: var(--hand); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-dim); margin-top: 6px; text-align: center; }
+  #rec { display: grid; grid-template-columns: 170px 1fr; gap: 24px; align-items: start; padding: 22px; border: 2.5px solid var(--ink); border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; background: var(--card); }
+  #rec .t { font-size: 32px; line-height: 1.05; text-wrap: balance; }
+  #rec .m { font-family: var(--hand); font-size: 11px; letter-spacing: .02em; color: var(--fg-dim); margin: 6px 0 14px; }
+  #rec .why { font-size: 17px; line-height: 1.45; }
+  #rec .why b { color: var(--accent); font-weight: 400; }
+  #runners { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 14px; }
+  .ru { display: grid; grid-template-columns: 56px 1fr; gap: 12px; align-items: start; padding: 12px 14px; border: 2px solid var(--ink); border-radius: 12px 4px 10px 5px / 5px 10px 4px 12px; background: var(--card); }
+  .ru .t { font-size: 18px; line-height: 1.1; }
+  .ru .w { font-family: var(--hand); font-size: 11px; line-height: 1.35; color: var(--fg-dim); margin-top: 4px; }
+  @media (max-width: 640px) { #rec { grid-template-columns: 110px 1fr; gap: 14px; } #rec .t { font-size: 24px; } }
+  .center { text-align: center; }
+  .foot { font-family: var(--hand); font-size: 11px; color: var(--fg-dim); text-align: center; line-height: 1.5; }
+  #again { font-family: var(--hand); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); background: none; border: 2.5px solid rgba(241,199,162,.8); border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; padding: 8px 22px; cursor: pointer; }
+  #again:hover, #again:focus-visible { border-color: var(--accent); background: rgba(241,199,162,.08); outline: none; }
+
+  @media (prefers-reduced-motion: reduce) { .pick, #card, #search, #light, #reveal { transition-duration: .01s; } }
+  @media (max-width: 640px) { #counted { border-top: 2.5px dashed rgba(241,199,162,.3); padding-top: 64px; min-width: 0; }
+  #counted { display: none; } #card { width: 180px; } #card .cast .r, #card .cr { display: none; } #held { width: 120px; height: 76px; } .pick { width: 44px; height: 64px; } #spinehint { display: none; } #hint { font-size: 9px; } }
+  /* ---- the whole closet, counted ---- */
+  #counted { border-top: 2.5px dashed rgba(241,199,162,.3); padding-top: 64px; min-width: 0; }
+  #counted { max-width: 100%; margin: 0; padding: 72px 0 0; display: grid; gap: 80px; }
+  #counted h1 { font-weight: 400; font-size: clamp(40px, 7vw, 68px); line-height: .98; margin: 0 0 18px; text-wrap: balance; }
+  #counted h2 { font-weight: 400; font-size: 31px; line-height: 1.1; margin: 0 0 10px; text-wrap: balance; }
+  #counted h3 { font-weight: 400; font-size: 21px; margin: 26px 0 8px; }
+  #counted p { font-size: 18px; max-width: 64ch; margin: 0 0 12px; }
+  #counted .eyebrow { font-family: var(--hand); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); display: inline-block; margin-bottom: 6px; }
+  #counted .lede { font-size: 21px; font-style: italic; color: var(--fg-dim); max-width: 56ch; }
+  #counted .note { font-family: var(--hand); font-size: 12px; color: var(--fg-dim); max-width: 70ch; margin-top: 8px; line-height: 1.4; }
+  #counted .big { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin: 24px 0; }
+  #counted .big div { padding: 14px 16px; border: 2.5px solid var(--ink); border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; background: var(--card); }
+  #counted .big b { display: block; font-size: 40px; font-weight: 400; line-height: 1; }
+  #counted .big span { font-family: var(--hand); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+  #counted canvas.chart { width: 100%; display: block; border: 2.5px solid var(--ink); border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; background: var(--card); }
+  #tip { position: fixed; pointer-events: none; background: var(--card); border: 2px solid var(--ink); border-radius: 12px 4px 10px 5px / 5px 10px 4px 12px; padding: 8px 12px; font-size: 15px; display: none; z-index: 9; max-width: 260px; box-shadow: 0 10px 24px rgba(28,22,32,.6); }
+  #tip small { font-family: var(--hand); font-size: 11px; color: var(--fg-dim); display: block; }
+  #counted .top { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 14px; }
+  #counted .top img { width: 100%; aspect-ratio: 2/3; object-fit: cover; border: 2px solid var(--ink); border-radius: 12px 4px 10px 5px / 5px 10px 4px 12px; background: #000; display: block; }
+  #counted .top .t { font-size: 14px; line-height: 1.15; margin-top: 6px; }
+  #counted .top .k { font-family: var(--hand); font-size: 10px; letter-spacing: .06em; color: var(--accent); }
+  #counted .van { columns: 2; column-gap: 28px; font-size: 16px; }
+  #counted .van div { break-inside: avoid; padding: 3px 0; }
+  #counted .van span { color: var(--fg-dim); font-style: italic; }
+  #counted .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; min-width: 0; }
+  #counted .cols2 > * { min-width: 0; }
+  #counted .list { font-size: 16px; }
+  #counted .list div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dashed rgba(243,234,219,.12); padding: 4px 0; }
+  #counted .list span { font-family: var(--hand); font-size: 11px; color: var(--accent); white-space: nowrap; }
+  #counted .list .m { color: var(--fg-dim); }
+  #counted table.fair { width: 100%; border-collapse: collapse; font-size: 15px; }
+  #counted table.fair td, #counted table.fair th { padding: 5px 8px; border-bottom: 1px dashed rgba(243,234,219,.12); text-align: left; }
+  #counted table.fair th { font-family: var(--hand); font-weight: 500; color: var(--accent); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+  #counted table.fair td.n { font-family: var(--hand); font-size: 12px; color: var(--fg-dim); text-align: right; white-space: nowrap; }
+  #counted table.fair th.n { text-align: right; }
+  #counted table.fair tr.up td:first-child::after { content: ' ↑'; color: var(--accent); }
+  #counted a { color: var(--accent); }
+  #counted .back { font-family: var(--hand); font-size: 16px; }
+  @media (max-width: 640px) {#counted .van { columns: 1; } #counted .cols2 { grid-template-columns: 1fr; } #counted p { font-size: 17px; }  }
+
+</style>
+</head>
+<body>
+<div id="room">
+  <canvas id="wall"></canvas>
+  <div id="vignette"></div>
+  <div id="grain"></div>
+  <div id="light"></div>
+  <div id="loading">opening the closet…</div>
+
+  <div id="hint">Drag or scroll to look around · type to search · click a spine to take it</div>
+  <div id="search"><input id="q" type="text" autocomplete="off" spellcheck="false" placeholder="title or director"></div>
+
+  <div id="card">
+    <img class="art" alt="">
+    <div class="t"></div>
+    <div class="m"></div>
+    <div class="cast"></div>
+    <div class="cr"></div>
+    <div class="p"></div>
+  </div>
+
+  <div id="spinehint"><b id="spineAt">No. 1</b>in front of you</div>
+  <div id="stack"><div id="held"></div><div id="count">pick <b>five</b></div></div>
+</div>
+
+<div class="tip" id="tip"></div>
+<div id="reveal">
+  <div class="inner">
+    <div>
+      <h1>You took five.</h1>
+      <div id="five" style="margin-top:28px"></div>
+    </div>
+    <section>
+      <span class="eyebrow">1 · your picks, placed</span>
+      <h2 id="placedH">Who took these before you</h2>
+      <p class="lede" id="placedL"></p>
+      <div id="placed"></div>
+    </section>
+    <section>
+      <span class="eyebrow">2 · one to take with you</span>
+      <h2>One to take with you</h2>
+      <div id="cornerL" hidden></div><div id="twins" hidden></div>
+      <p class="lede">Picked for you from the rest of the closet, by what your five have in common with it and by what the guests in your corner took.</p>
+      <div id="rec"></div>
+      <div id="runners"></div>
+    </section>
+    <section>
+      <span class="eyebrow">3 · where you sit</span>
+      <h2>Your place in the closet</h2>
+      <p class="lede">Every release in the closet placed by its year and where it was made. Your five are the bright points; the warm ones are the other picks of the three guests whose shelves overlap yours most.</p>
+      <canvas id="map"></canvas>
+      <div id="mapnote"></div>
+    </section>
+    <section>
+      <span class="eyebrow">4 · your profile in four numbers</span>
+      <h2>Compared with 421 visits</h2>
+      <div id="nums"></div>
+    </section>
+    <div id="counted">
+<header>
+  <h1 style="font-size:clamp(34px,6vw,56px);text-align:left">The Closet, Counted</h1>
+  <p class="lede">That was your five. This is what <span id="hPicks"></span> picks by 421 guests since 2010 say about the canon Criterion built, and the one its guests built from it.</p>
+  <div class="big" id="big"></div>
+</header>
+<section>
+  <span class="eyebrow">1 · raw counts</span>
+  <h2 id="fairH">Twenty films, nine percent of the picks</h2>
+  <p>The covers are the twenty most-taken films by raw count. Together they are only <span id="hTop2"></span>% of all picks.</p>
+  <div class="top" id="top" style="grid-template-columns:repeat(5,1fr)"></div>
+</section>
+
+<section>
+  <span class="eyebrow">2 · but raw counts don't tell the whole story</span>
+  <h2>Older releases have had more chances to be taken</h2>
+  <p>A film that has been on the shelf since 2010 has been in the room for every visit. A film released in 2023 has been there for a few dozen. Raw counts reward the first group. So the table below counts picks per hundred visits that had the film available, and only ranks films available for at least sixty visits. Arrows mark films outside the raw top fifty that make the top twenty this way.</p>
+  <table class="fair" id="fair"></table>
+</section>
+
+<section>
+  <span class="eyebrow">3 · the shelf</span>
+  <h2>The picks are spread thin, all the way down the shelf</h2>
+  <p>Rank every film by how many visits took it, most-taken first. Walk down the list and add up the share of all <span id="hPicks3"></span> picks as you go. A hits list would shoot up and flatten within the first few dozen films. This one doesn't.</p>
+  <canvas class="chart" id="bands" height="320"></canvas>
+  <p class="note">The dotted line is what the curve would look like if every film were taken equally often. Films sold only inside a box set are counted with the set, since that is what guests take; the red tail counts standalone releases only. Hover the curve for any point.</p>
+  <p id="bandText" style="margin-top:16px"></p>
+  <p id="stripText"></p>
+</section>
+
+<section>
+  <span class="eyebrow">4 · what Criterion canonized</span>
+  <h2>Forty years of releases, by country and decade</h2>
+  <p>The collection as a grid: how many releases come from each country and decade. The weight is in France and Japan in the 1950s and 60s, and in American film in every decade since the 1930s.</p>
+  <canvas class="chart" id="gridA" height="360"></canvas>
+</section>
+
+<section>
+  <span class="eyebrow">5 · what the guests took</span>
+  <h2>The heaviest shelves are the ones guests walk past</h2>
+  <p>The same grid, now showing how often guests took films from each cell compared with picking at random from the shelf as it stood on the day they visited. Warm means over-taken, cool means under-taken.</p>
+  <canvas class="chart" id="gridB" height="360"></canvas>
+  <p class="note">Ratio of picks to expected picks; cells with fewer than eight expected picks are blank. "The shelf as it stood" is approximated by spine number, since Criterion numbers releases in order.</p>
+  <p id="gridText" style="margin-top:16px"></p>
+</section>
+
+<section>
+  <span class="eyebrow">6 · directors</span>
+  <h2>Breadth and depth</h2>
+  <p>Picks against distinct titles for every director with ten or more picks. Scorsese and Kurosawa are taken often and across many films. Fellini is taken as often, but mostly for La strada and 8½. Spike Lee is almost entirely Do the Right Thing. Hover any point for the name.</p>
+  <canvas class="chart" id="dirs" height="420"></canvas>
+</section>
+
+<section>
+  <span class="eyebrow">7 · people</span>
+  <h2>The names that keep coming off the shelf</h2>
+  <p>Actors, cinematographers and director–cinematographer pairs, counted by the number of visits that took a film they worked on. Only people with at least three releases in the collection, so one hit doesn't crown a supporting player.</p>
+  <div class="cols2">
+    <div><h3>Actors</h3><div class="list" id="actors"></div></div>
+    <div><h3>Cinematographers</h3><div class="list" id="dps"></div></div>
+  </div>
+  <div class="cols2">
+    <div><h3>Partnerships</h3><div class="list" id="teams"></div></div>
+    <div><h3>Shot many, taken rarely</h3><div class="list" id="dpsRare"></div><p class="note">The French and Swedish gap, seen through the people who shot those films.</p></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">8 · how a visit goes</span>
+  <h2>Canon first, then personal, then whatever is next to it</h2>
+  <p>The shop pages list picks in the order they come off the shelf in the video. The first film off the shelf has been taken by more other guests than the fourth, and is older on average.</p>
+  <canvas class="chart" id="order" height="250"></canvas>
+  <p id="neighText" style="margin-top:16px"></p>
+  <h3 id="vanH"></h3>
+  <p>Picks where the guest appears in the cast or credits. Two percent of all picks.</p>
+  <div class="van" id="van"></div>
+</section>
+
+<section>
+  <span class="eyebrow">9 · drift</span>
+  <h2>The picks have become more American</h2>
+  <p>The share of each year's picks that are American films, against the American share of the shelf that year. Early on the two track each other. Since 2016 the picks run a third to a half above the shelf. The shelf did not change that much. Who was invited probably did; this data can't say.</p>
+  <canvas class="chart" id="drift" height="260"></canvas>
+</section>
+
+<section>
+  <span class="eyebrow">10 · smaller things</span>
+  <h2>Long films are fine; short ones aren't</h2>
+  <div class="cols2">
+    <div><canvas class="chart" id="rt" height="220"></canvas><p class="note" id="rtText"></p></div>
+    <div><p>Share of films by running time, shelf against picks. Films under ninety minutes are taken well below their share. Films over two hours are taken slightly above it. Black-and-white is taken a little below its share of the shelf, less than the age of the films would suggest.</p></div>
+  </div>
+</section>
+    
+<section>
+  <span class="eyebrow">method</span>
+  <h2>How this was built</h2>
+  <p><b>Sources.</b> Each visit's picks come from the shop collection page Criterion publishes for it (criterion.com/closet-picks): <span id="mVisits"></span> visits, <span id="mFirst"></span> to <span id="mLast"></span>. Film details, cast and credits come from each release's page on criterion.com, joined by spine number. Guests who visited together count as one visit; guests who returned count twice.</p>
+  <p><b>The shelf as it stood.</b> Criterion numbers releases in order, so the shelf at a visit is approximated by the third-highest spine seen in any pick up to that date. <span id="mAhead"></span> picks sit ahead of this proxy because Criterion later released a film a guest had asked for and added it to the old page. Films sold only inside box sets are excluded from per-film counts.</p>
+  <p><b>Tested and not found.</b> Whether a film's pick rate rises after a widely viewed guest takes it (no: 1.3 per hundred visits before, 1.0 after). Whether September–October visits, festival season in New York, differ in what they take (they don't). Whether any two visits share a shelf: of <span id="mPairs"></span> possible pairs of visits, <span id="mPairs2"></span> share two or more picks, which is why the page above gives you one film rather than a twin.</p>
+  <p><b>Limits.</b> The shop page lists what is in print, so a few early visits are shorter than their videos. Nothing here says why anyone picked anything. The notebook with every table is in the repository.</p>
+  <p class="note">Cover art and film data © The Criterion Collection, used here for a personal, non-commercial study.</p>
+</section>
+</div>
+    <div class="center"><button id="again">Back into the closet</button></div>
+    <p class="foot">Picks from Criterion's Closet Picks pages, 2010–2026. Guests who visited twice are counted as two visits. Everything here is overlap counting on about three thousand picks, not prediction.</p>
+  </div>
+</div>
+
+<script>
+// ---------- data ----------
+let FILMS = [];
+function hash(n){ let x = (n * 2654435761) >>> 0; x ^= x >>> 15; x = (x * 2246822519) >>> 0; return (x ^ (x >>> 13)) >>> 0; }
+
+// ---------- the room, in meters ----------
+const ROOM = { halfW: 1.02, depth: 2.25, height: 2.6, shelfDepth: 0.16, plank: 0.022 };
+const SPINE_H = 0.185, SHELF_GAP = 0.245, N_SHELVES = 10, DIVIDER = 0.045;
+const EYE = { x: 0, y: 1.5, z: 0.42 };
+const RUNS = [
+  { wall: 'L', len: ROOM.depth - ROOM.shelfDepth },
+  { wall: 'B', len: 2 * (ROOM.halfW - ROOM.shelfDepth) },
+  { wall: 'R', len: ROOM.depth - ROOM.shelfDepth },
+];
+let shelves = [];
+function placeFilms() {
+  FILMS.forEach(f => {
+    f.w0 = (0.0145 + (hash(f.spine) % 5) * 0.0012) * (f.set ? 2.2 : 1);        // box sets are fat
+    f.h = SPINE_H * (0.94 + (hash(f.spine * 17) % 12) / 100);
+    f.lean = (hash(f.spine * 23) % 13 === 0) ? ((hash(f.spine * 29) % 2 ? 1 : -1) * 0.01) : 0;
+  });
+  const perShelf = RUNS.reduce((a, r) => a + r.len - DIVIDER, 0);
+  const total = FILMS.reduce((a, f) => a + f.w0 + 0.0015, 0);
+  const scale = Math.max(1, (N_SHELVES * perShelf * 0.985) / total);
+  FILMS.forEach(f => { f.w = f.w0 * scale; });
+  shelves = []; const bottom = 0.07;
+  for (let i = N_SHELVES - 1; i >= 0; i--) shelves.push(bottom + i * SHELF_GAP);
+  let si = 0, run = 0, pos = 0;
+  FILMS.forEach(f => {
+    const half = RUNS[run].len / 2;
+    if (pos < half && pos + f.w > half - DIVIDER / 2) pos = half + DIVIDER / 2;
+    if (pos + f.w > RUNS[run].len * 0.995) { pos = 0; run++; if (run >= RUNS.length) { run = 0; si++; } }
+    if (si >= shelves.length) { f.hidden = true; return; }
+    f.hidden = false; f.wall = RUNS[run].wall; f.s = pos; f.y = shelves[si] + ROOM.plank / 2; pos += f.w + 0.0015;
+  });
+}
+function spineCorners(f, pull) {
+  const y0 = f.y, y1 = f.y + f.h, inset = ROOM.shelfDepth - 0.045 + (pull || 0), L = f.lean;
+  if (f.wall === 'L') { const x = -ROOM.halfW + inset; return [[x, y1, f.s + L], [x, y1, f.s + f.w + L], [x, y0, f.s + f.w], [x, y0, f.s]]; }
+  if (f.wall === 'R') { const x = ROOM.halfW - inset, zb = ROOM.depth - ROOM.shelfDepth; return [[x, y1, zb - f.s - L], [x, y1, zb - f.s - f.w - L], [x, y0, zb - f.s - f.w], [x, y0, zb - f.s]]; }
+  const z = ROOM.depth - inset, x0 = -ROOM.halfW + ROOM.shelfDepth + f.s; return [[x0 + L, y1, z], [x0 + f.w + L, y1, z], [x0 + f.w, y0, z], [x0, y0, z]];
+}
+
+// ---------- camera ----------
+const wall = document.getElementById('wall');
+const ctx = wall.getContext('2d');
+const DPR = Math.min(2, window.devicePixelRatio || 1);
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let W = 0, H = 0, F = 600;
+const cam = { yaw: 0, pitch: 0 }, camT = { yaw: 0, pitch: 0 };
+const NEAR = 0.08;
+function toCam(p) {
+  const dx = p[0] - EYE.x, dy = p[1] - EYE.y, dz = p[2] - EYE.z;
+  const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
+  const x = dx * cy - dz * sy, z1 = dx * sy + dz * cy;
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  return [x, dy * cp - z1 * sp, dy * sp + z1 * cp];
+}
+function proj(c) { return [W / 2 + F * c[0] / c[2], H / 2 - F * c[1] / c[2]]; }
+function clipNear(pts) {
+  const out = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length], ain = a[2] >= NEAR, bin = b[2] >= NEAR;
+    if (ain) out.push(a);
+    if (ain !== bin) { const t = (NEAR - a[2]) / (b[2] - a[2]); out.push([a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, NEAR]); }
+  }
+  return out;
+}
+function wob(x, y, k) { const n = hash(Math.round(x * 3.1 + 17) * 31 + Math.round(y * 2.7 + 5) * 7 + k); return ((n % 1000) / 1000 - 0.5) * 2; }
+function poly(worldPts, fill, line, sag) {
+  const c = clipNear(worldPts.map(toCam)); if (c.length < 3) return;
+  const s = c.map(p => { const q = proj(p); return [q[0] + wob(q[0], q[1], 1) * 2.6, q[1] + wob(q[0], q[1], 2) * 2.6]; });
+  ctx.beginPath();
+  for (let i = 0; i < s.length; i++) {
+    const a = s[i], b = s[(i + 1) % s.length];
+    const horiz = Math.abs(b[0] - a[0]) > Math.abs(b[1] - a[1]);
+    const mx = (a[0] + b[0]) / 2 + wob(a[0] + b[0], a[1] + b[1], 3) * 3.4, my = (a[1] + b[1]) / 2 + wob(a[1] + b[1], a[0], 4) * 3.4 + (horiz && sag ? sag * Math.min(1, Math.abs(b[0]-a[0]) / 300) : 0);
+    if (!i) ctx.moveTo(a[0], a[1]);
+    ctx.quadraticCurveTo(mx, my, b[0], b[1]);
+  }
+  ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+  if (line) { ctx.strokeStyle = line; ctx.lineWidth = 2.8; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke(); }
+}
+let chalk = null;
+function chalkPattern() {
+  if (chalk) return chalk;
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  for (let i = 0; i < 9000; i++) { const v = hash(i) % 255; g.fillStyle = `rgba(${v},${v},${v},${(hash(i*3) % 100) / 400})`; g.fillRect(hash(i*7) % 256, hash(i*11) % 256, 1 + (hash(i*13) % 2), 1); }
+  chalk = ctx.createPattern(c, 'repeat'); return chalk;
+}
+function layout() {
+  W = innerWidth; H = innerHeight;
+  wall.width = W * DPR; wall.height = H * DPR; wall.style.width = W + 'px'; wall.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  F = Math.min(W / 2 / Math.tan(0.8), H / 2 / Math.tan(0.66));
+  draw();
+}
+
+// ---------- cover art: loading and colour ----------
+const queue = []; let inflight = 0; const CONC = 6;
+function pump() {
+  while (inflight < CONC && queue.length) {
+    const f = queue.shift(); if (f.img || f.loading || !f.cover) continue;
+    f.loading = true; inflight++;
+    const im = new Image();
+    im.onload = () => { inflight--; f.img = im; f.colors = coverColors(im); sprites.delete(f.spine); scheduleDraw(); pump(); };
+    im.onerror = () => { inflight--; f.loading = false; f.cover = null; pump(); };
+    im.src = f.cover;
+  }
+}
+function prioritise(f) { if (!f.img && f.cover) { const k = queue.indexOf(f); if (k > 0) queue.splice(k, 1); if (k !== 0) queue.unshift(f); pump(); } }
+function coverColors(im) {
+  // average colour of the whole cover, plus the colour of its left band, which is what a Criterion spine usually takes
+  const c = document.createElement('canvas'); c.width = 16; c.height = 24; const g = c.getContext('2d');
+  g.drawImage(im, 0, 0, 16, 24); const d = g.getImageData(0, 0, 16, 24).data;
+  let r = 0, gg = 0, b = 0, n = 0, lr = 0, lg = 0, lb = 0, ln = 0;
+  for (let y = 0; y < 24; y++) for (let x = 0; x < 16; x++) { const i = (y * 16 + x) * 4; r += d[i]; gg += d[i+1]; b += d[i+2]; n++; if (x < 3) { lr += d[i]; lg += d[i+1]; lb += d[i+2]; ln++; } }
+  const avg = [r/n, gg/n, b/n], left = [lr/ln, lg/ln, lb/ln];
+  // push a little toward pastel so the room stays a drawing
+  const pastel = c3 => c3.map(v => Math.round(v * 0.82 + 255 * 0.18));
+  return { avg: pastel(avg), left: pastel(left) };
+}
+let drawPending = false;
+function scheduleDraw() { if (drawPending) return; drawPending = true; requestAnimationFrame(() => { drawPending = false; draw(); }); }
+
+// ---------- sprites ----------
+const SPW = 26, SPH = 200;
+const sprites = new Map();
+const FALLBACK = ['#d8322a','#e8b23a','#2a5ca8','#e07a2b','#3c8a5a','#7a4fa0','#c93c73','#6fb3c7','#9a7b4f','#f4f1ea','#ece7dc','#1d1d22','#2b2a30'];
+function rgb(c) { return `rgb(${c[0]},${c[1]},${c[2]})`; }
+function lum(c) { return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]; }
+function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+function spineRGB(f) { return f.colors ? f.colors.left : hexToRgb(FALLBACK[hash(f.spine * 3) % FALLBACK.length]); }
+function chalkify(g, w, h, seed, amt) {
+  for (let i = 0; i < amt; i++) { const v = hash(seed + i) % 2 ? 255 : 20; g.fillStyle = `rgba(${v},${v},${v},${(hash(seed*3 + i) % 60) / 400})`; g.fillRect(hash(seed*7 + i) % w, hash(seed*11 + i) % h, 1 + (hash(seed*13 + i) % 2), 1); }
+}
+function roughRect(g, x, y, w, h, seed, fill, line) {
+  const j = k => (hash(seed * 13 + k) % 100) / 100 - 0.5;
+  g.beginPath(); g.moveTo(x + j(1), y + j(2));
+  g.quadraticCurveTo(x + w/2, y + j(3)*2, x + w + j(4), y + j(5));
+  g.quadraticCurveTo(x + w + j(6)*2, y + h/2, x + w + j(7), y + h + j(8));
+  g.quadraticCurveTo(x + w/2, y + h + j(9)*2, x + j(10), y + h + j(11));
+  g.quadraticCurveTo(x + j(12)*2, y + h/2, x + j(1), y + j(2)); g.closePath();
+  g.fillStyle = fill; g.fill();
+  if (line) { g.strokeStyle = line; g.lineWidth = 2.4; g.lineJoin = 'round'; g.stroke(); }
+}
+function makeSpine(f) {
+  const c = document.createElement('canvas'); c.width = SPW * DPR; c.height = SPH * DPR;
+  const g = c.getContext('2d'); g.scale(DPR, DPR);
+  const ink = 'rgba(28,22,32,.95)', col = spineRGB(f), light = lum(col) > 150, text = light ? '#1c1620' : '#f3eadb';
+  roughRect(g, 1, 1, SPW - 2, SPH - 2, f.spine, rgb(col), ink);
+  if (f.colors) { // a sliver of the cover's own art at the top, like the picture band on some spines
+    g.save(); g.beginPath(); g.rect(3, 3, SPW - 6, SPH * 0.14); g.clip();
+    g.drawImage(f.img, 0, 0, f.img.naturalWidth, f.img.naturalHeight * 0.25, 3, 3, SPW - 6, SPH * 0.14);
+    g.fillStyle = 'rgba(243,234,219,.15)'; g.fillRect(3, 3, SPW - 6, SPH * 0.14); g.restore();
+    g.strokeStyle = ink; g.lineWidth = 1.4; g.strokeRect(3, 3, SPW - 6, SPH * 0.14);
+  }
+  chalkify(g, SPW, SPH, f.spine, 220);
+  g.save(); g.translate(SPW/2 + 0.5, SPH - 32); g.rotate(-Math.PI/2);
+  g.fillStyle = text; g.font = `600 11px ${getComputedStyle(document.documentElement).getPropertyValue('--display')}`; g.textBaseline = 'middle';
+  let t = f.title.toUpperCase(); const maxW = SPH - 52 - (f.colors ? SPH * 0.14 : 0);
+  while (g.measureText(t).width > maxW && t.length > 3) t = t.slice(0, -2);
+  g.fillText(t, 0, 0); g.restore();
+  roughRect(g, 3, SPH - 23, SPW - 6, 16, f.spine + 1, light ? '#1c1620' : '#f3eadb', ink);
+  g.fillStyle = light ? '#f3eadb' : '#1c1620'; g.font = '600 8px "Montserrat", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(String(f.spine), SPW/2, SPH - 15);
+  return c;
+}
+function sprite(f) { let s = sprites.get(f.spine); if (!s) { s = makeSpine(f); sprites.set(f.spine, s); } return s; }
+function drawCover(g, f, w, h) {
+  const ink = 'rgba(28,22,32,.95)';
+  if (f.img) {
+    g.drawImage(f.img, 0, 0, w, h);
+    g.fillStyle = 'rgba(243,234,219,.10)'; g.fillRect(0, 0, w, h); chalkify(g, w, h, f.spine + 5, Math.round(w * h / 80));
+    roughRect(g, 2, 2, w - 4, h - 4, f.spine + 2, 'rgba(0,0,0,0)', ink); return;
+  }
+  const col = spineRGB(f), light = lum(col) > 150;
+  g.fillStyle = '#f3eadb'; g.fillRect(0, 0, w, h);
+  roughRect(g, 3, 3, w - 6, h - 6, f.spine + 2, rgb(col), ink);
+  g.fillStyle = light ? '#1c1620' : '#f3eadb'; g.font = `500 ${w*0.11}px ${getComputedStyle(document.documentElement).getPropertyValue('--display')}`; g.textBaseline = 'top';
+  const words = f.title.toUpperCase().split(' '); let line = '', y = h*0.66; const lines = [];
+  words.forEach(wd => { const t = line ? line + ' ' + wd : wd; if (g.measureText(t).width > w*0.8) { lines.push(line); line = wd; } else line = t; }); lines.push(line);
+  lines.slice(0,3).forEach((l,i) => g.fillText(l, w*0.1, y + i*w*0.13));
+  g.font = `700 ${w*0.07}px "Montserrat", sans-serif`; g.fillText(String(f.spine), w*0.1, h*0.05);
+}
+
+// ---------- draw ----------
+let hover = -1, picks = [], query = "", closing = false;
+let quads = [];
+function matches(f) { if (!query) return true; const q = query.toLowerCase(); return f.title.toLowerCase().includes(q) || (f.director || '').toLowerCase().includes(q) || String(f.spine) === q; }
+function drawWalls() {
+  const hw = ROOM.halfW, d = ROOM.depth, h = ROOM.height, z0 = -0.6, sd = ROOM.shelfDepth;
+  const LINE = 'rgba(18,16,20,.9)';
+  ctx.fillStyle = '#1e1d21'; ctx.fillRect(0, 0, W, H);
+  poly([[-hw, 0, z0], [hw, 0, z0], [hw, 0, d], [-hw, 0, d]], '#bfb199', LINE);
+  poly([[-hw, 0, d], [hw, 0, d], [hw, h, d], [-hw, h, d]], '#ebe8e0', LINE);
+  poly([[-hw, 0, z0], [-hw, 0, d], [-hw, h, d], [-hw, h, z0]], '#e4e1d9', LINE);
+  poly([[hw, 0, z0], [hw, 0, d], [hw, h, d], [hw, h, z0]], '#e4e1d9', LINE);
+  poly([[-hw, h, z0], [hw, h, z0], [hw, h, d], [-hw, h, d]], '#fbfaf4', LINE);
+  const beam = 0.035, B = '#2a292e';
+  [-hw + sd, 0, hw - sd].forEach(x => poly([[x - beam, h - 0.001, z0], [x + beam, h - 0.001, z0], [x + beam, h - 0.001, d], [x - beam, h - 0.001, d]], B, LINE));
+  [0.2, (d - sd) / 2 + 0.1, d - sd].forEach(z => poly([[-hw, h - 0.002, z - beam], [hw, h - 0.002, z - beam], [hw, h - 0.002, z + beam], [-hw, h - 0.002, z + beam]], B, LINE));
+  const post = (x, z, w) => poly([[x - w, 0.02, z], [x + w, 0.02, z], [x + w, h - 0.03, z], [x - w, h - 0.03, z]], '#26252a', LINE);
+  post(-hw + sd, d - sd, 0.03); post(hw - sd, d - sd, 0.03);
+  post(-hw + sd, (d - sd) / 2, 0.022); post(hw - sd, (d - sd) / 2, 0.022);
+  post(-hw + sd, -0.02, 0.03); post(hw - sd, -0.02, 0.03);
+}
+function drawPlank(y) {
+  const hw = ROOM.halfW, d = ROOM.depth, sd = ROOM.shelfDepth, t = ROOM.plank, z0 = -0.2;
+  const top = y + t / 2, bot = y - t / 2, above = top > EYE.y;
+  const LINE = 'rgba(12,11,14,.95)', topFill = '#3a393f', frontFill = '#232227', underFill = '#141317';
+  poly([[-hw, above ? bot : top, d - sd], [hw, above ? bot : top, d - sd], [hw, above ? bot : top, d], [-hw, above ? bot : top, d]], above ? underFill : topFill, LINE);
+  poly([[-hw, top, d - sd], [hw, top, d - sd], [hw, bot, d - sd], [-hw, bot, d - sd]], frontFill, LINE, 1.2);
+  poly([[-hw, above ? bot : top, z0], [-hw + sd, above ? bot : top, z0], [-hw + sd, above ? bot : top, d - sd], [-hw, above ? bot : top, d - sd]], above ? underFill : topFill, LINE);
+  poly([[-hw + sd, top, z0], [-hw + sd, top, d - sd], [-hw + sd, bot, d - sd], [-hw + sd, bot, z0]], frontFill, LINE, 1.2);
+  poly([[hw, above ? bot : top, z0], [hw - sd, above ? bot : top, z0], [hw - sd, above ? bot : top, d - sd], [hw, above ? bot : top, d - sd]], above ? underFill : topFill, LINE);
+  poly([[hw - sd, top, z0], [hw - sd, top, d - sd], [hw - sd, bot, d - sd], [hw - sd, bot, z0]], frontFill, LINE, 1.2);
+}
+function drawSpine(f, i) {
+  const pull = i === hover ? 0.08 : 0;
+  const c = spineCorners(f, pull).map(toCam);
+  if (c.some(p => p[2] < NEAR)) return;
+  const s = c.map(proj);
+  if (s.every(p => p[0] < -20) || s.every(p => p[0] > W + 20) || s.every(p => p[1] < -20) || s.every(p => p[1] > H + 20)) return;
+  const dim = !matches(f);
+  const [tl, tr, br, bl] = s;
+  if (!f.img && f.cover && Math.abs(tr[0] - tl[0]) > 5) queue.includes(f) || f.loading || queue.push(f);   // visible and big enough to matter: load its cover
+  if (i === hover) {
+    ctx.save(); ctx.fillStyle = 'rgba(28,22,32,.5)'; ctx.filter = 'blur(7px)';
+    ctx.beginPath(); ctx.moveTo(tl[0]+4, tl[1]+8); ctx.lineTo(tr[0]+10, tr[1]+8); ctx.lineTo(br[0]+10, br[1]+10); ctx.lineTo(bl[0]+4, bl[1]+10); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  ctx.save();
+  ctx.setTransform(DPR * (tr[0]-tl[0]) / SPW, DPR * (tr[1]-tl[1]) / SPW, DPR * (bl[0]-tl[0]) / SPH, DPR * (bl[1]-tl[1]) / SPH, DPR * tl[0], DPR * tl[1]);
+  ctx.globalAlpha = dim ? 0.14 : 1;
+  ctx.drawImage(sprite(f), 0, 0, SPW, SPH);
+  ctx.restore();
+  // hit-test against the spine's resting position, so pulling it out doesn't move it from under the cursor
+  quads.push({ i, pts: pull ? spineCorners(f, 0).map(toCam).map(proj) : s });
+}
+function draw() {
+  if (!FILMS.length) return;
+  quads = [];
+  drawWalls();
+  shelves.forEach(drawPlank);
+  const order = [];
+  FILMS.forEach((f, i) => { if (f.hidden || f.taken) return; const c = spineCorners(f, 0)[0]; const dx = c[0]-EYE.x, dz = c[2]-EYE.z; order.push([dx*dx+dz*dz, i]); });
+  order.sort((a, b) => b[0] - a[0]);
+  order.forEach(o => { if (o[1] !== hover) drawSpine(FILMS[o[1]], o[1]); });
+  if (hover >= 0) drawSpine(FILMS[hover], hover);
+  ctx.save(); ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = .35; ctx.fillStyle = chalkPattern(); ctx.fillRect(0, 0, W, H); ctx.restore();
+  let best = null, bd = 1e9;
+  for (const q of quads) { const cx = (q.pts[0][0] + q.pts[2][0]) / 2, cy = (q.pts[0][1] + q.pts[2][1]) / 2; const d = (cx-W/2)**2 + (cy-H/2)**2; if (d < bd) { bd = d; best = q; } }
+  if (best) document.getElementById('spineAt').textContent = 'No. ' + FILMS[best.i].spine;
+  pump();
+}
+
+// ---------- looking around ----------
+let raf = 0;
+function tick() {
+  const k = REDUCED ? 1 : 0.14;
+  cam.yaw += (camT.yaw - cam.yaw) * k; cam.pitch += (camT.pitch - cam.pitch) * k;
+  draw();
+  if (Math.abs(camT.yaw - cam.yaw) > 0.0005 || Math.abs(camT.pitch - cam.pitch) > 0.0005) raf = requestAnimationFrame(tick); else { cam.yaw = camT.yaw; cam.pitch = camT.pitch; draw(); raf = 0; }
+}
+const YAW_MAX = Math.PI * 0.6, PITCH_MAX = 0.55;
+function look(dyaw, dpitch, snap) {
+  camT.yaw = Math.max(-YAW_MAX, Math.min(YAW_MAX, camT.yaw + dyaw));
+  camT.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, camT.pitch + dpitch));
+  if (snap) { cam.yaw = camT.yaw; cam.pitch = camT.pitch; draw(); } else if (!raf) raf = requestAnimationFrame(tick);
+}
+wall.addEventListener('wheel', e => { e.preventDefault(); if (e.shiftKey) look(e.deltaY * 0.0016, 0); else look(e.deltaX * 0.0016, -e.deltaY * 0.0012); }, {passive:false});
+let drag = null;
+wall.addEventListener('pointerdown', e => { drag = {x:e.clientX, y:e.clientY, moved:false, yaw:camT.yaw, pitch:camT.pitch}; wall.setPointerCapture(e.pointerId); wall.classList.add('grabbing'); });
+wall.addEventListener('pointermove', e => {
+  if (drag) {
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+    camT.yaw = drag.yaw; camT.pitch = drag.pitch;
+    look(-dx / F * 0.95, dy / F * 0.8, true);
+    return;
+  }
+  if (e.pointerType === 'mouse') setHover(hit(e.clientX, e.clientY), e.clientX, e.clientY);
+});
+wall.addEventListener('pointerup', e => {
+  wall.classList.remove('grabbing');
+  const wasDrag = drag && drag.moved; drag = null;
+  if (wasDrag) return;
+  const i = hit(e.clientX, e.clientY);
+  if (i < 0) { if (e.pointerType !== 'mouse') setHover(-1); return; }
+  if (e.pointerType !== 'mouse' && hover !== i) { setHover(i, e.clientX, e.clientY); return; }
+  take(i);
+});
+wall.addEventListener('pointerleave', () => setHover(-1));
+addEventListener('keydown', e => {
+  const q = document.getElementById('q');
+  if (document.activeElement === q) { if (e.key === 'Escape') { q.value = ''; setQuery(''); q.blur(); } return; }
+  if (e.key === 'ArrowRight') look(0.22, 0);
+  else if (e.key === 'ArrowLeft') look(-0.22, 0);
+  else if (e.key === 'ArrowUp') look(0, 0.12);
+  else if (e.key === 'ArrowDown') look(0, -0.12);
+  else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey) { q.value = e.key; setQuery(e.key); q.focus(); e.preventDefault(); }
+});
+function inQuad(p, q) {
+  let sgn = 0;
+  for (let i = 0; i < 4; i++) { const a = q[i], b = q[(i+1)%4]; const c = (b[0]-a[0])*(p[1]-a[1]) - (b[1]-a[1])*(p[0]-a[0]); if (c !== 0) { const s = c > 0 ? 1 : -1; if (sgn && s !== sgn) return false; sgn = s; } }
+  return true;
+}
+function hit(px, py) {
+  for (let k = quads.length - 1; k >= 0; k--) { const q = quads[k]; const pts = q.pts.map(p => [p[0], p[1]]); pts[1][0] += 1.5; pts[2][0] += 1.5; if (inQuad([px, py], pts)) return q.i; }
+  // in the gap between two spines: keep the one you were on
+  if (hover >= 0) { const q = quads.find(q => q.i === hover); if (q) { const pts = q.pts.map(p => [p[0], p[1]]); pts[0][0] -= 3; pts[3][0] -= 3; pts[1][0] += 3; pts[2][0] += 3; if (inQuad([px, py], pts)) return hover; } }
+  return -1;
+}
+function faceFilm(f) {
+  const c = spineCorners(f, 0); const x = (c[0][0] + c[1][0]) / 2 - EYE.x, z = (c[0][2] + c[1][2]) / 2 - EYE.z, y = (c[0][1] + c[2][1]) / 2 - EYE.y;
+  camT.yaw = Math.max(-YAW_MAX, Math.min(YAW_MAX, Math.atan2(x, z)));
+  camT.pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, Math.atan2(y, Math.hypot(x, z)) * 0.8));
+  if (!raf) raf = requestAnimationFrame(tick);
+}
+
+// ---------- hover card ----------
+const card = document.getElementById('card'), cardArt = card.querySelector('.art');
+function setHover(i, px, py) {
+  if (i === hover && i >= 0) { place(px, py); return; }
+  hover = i; draw();
+  if (i < 0) { card.classList.remove('on'); return; }
+  const f = FILMS[i]; prioritise(f);
+  cardArt.src = f.cover || ''; cardArt.alt = f.title;
+  card.querySelector('.t').textContent = f.title;
+  const meta = [f.director, f.year, f.country, f.runtime ? f.runtime + ' min' : null, f.language].filter(Boolean).join(' · ');
+  card.querySelector('.m').textContent = meta;
+  const castEl = card.querySelector('.cast'); castEl.innerHTML = '';
+  (f.cast || []).slice(0, 5).forEach(([a, r]) => { const x = document.createElement('div'); x.className = 'a'; x.textContent = a; const y = document.createElement('div'); y.className = 'r'; y.textContent = r; castEl.append(x, y); });
+  castEl.hidden = !(f.cast && f.cast.length);
+  const crEl = card.querySelector('.cr'); crEl.innerHTML = '';
+  (f.credits || []).forEach(([k, v]) => { const x = document.createElement('div'); x.className = 'k'; x.textContent = k; const y = document.createElement('div'); y.className = 'v'; y.textContent = v; crEl.append(x, y); });
+  crEl.hidden = !(f.credits && f.credits.length);
+  const p = card.querySelector('.p');
+  if (f.picks === 0) { p.textContent = 'Never taken out of the closet.'; p.className = 'p never'; }
+  else {
+    const names = f.pickers.slice(0, 3).join(', '); const more = f.picks - Math.min(3, f.pickers.length);
+    p.textContent = `Taken by ${f.picks} guest${f.picks === 1 ? '' : 's'}: ${names}${more > 0 ? ' and ' + more + ' more' : ''}.`; p.className = 'p';
+  }
+  card.classList.add('on'); place(px, py);
+}
+function place(px, py) {
+  const cw = card.offsetWidth, ch = card.offsetHeight;
+  let x = px + 28, y = py - ch/2;
+  if (x + cw > W - 12) x = px - cw - 28;
+  if (x < 12) x = 12;
+  y = Math.max(12, Math.min(H - ch - 12, y));
+  card.style.left = x + 'px'; card.style.top = y + 'px';
+}
+
+// ---------- search ----------
+const searchBox = document.getElementById('search'), hint = document.getElementById('hint'), qEl = document.getElementById('q');
+qEl.addEventListener('input', () => setQuery(qEl.value));
+qEl.addEventListener('blur', () => { if (!qEl.value) { searchBox.classList.remove('on'); hint.classList.remove('off'); } });
+function setQuery(v) {
+  query = v.trim();
+  const open = !!query || document.activeElement === qEl;
+  searchBox.classList.toggle('on', open); hint.classList.toggle('off', open);
+  const first = FILMS.find(f => !f.taken && !f.hidden && matches(f));
+  if (query && first) faceFilm(first);
+  draw();
+}
+
+// ---------- taking ----------
+const held = document.getElementById('held'), count = document.getElementById('count');
+const WORDS = ['five','four','three','two','one'];
+function take(i) {
+  if (closing || picks.length >= 5) return;
+  const f = FILMS[i]; const q = quads.find(q => q.i === i);
+  f.taken = true; picks.push(f); hover = -1; card.classList.remove('on'); draw();
+  const sx = q ? Math.min(q.pts[0][0], q.pts[3][0]) : W/2, sy = q ? Math.min(q.pts[0][1], q.pts[1][1]) : H/2;
+  const sw = q ? Math.max(8, Math.abs(q.pts[1][0] - q.pts[0][0])) : 14, sh = q ? Math.abs(q.pts[3][1] - q.pts[0][1]) : 120;
+  const fly = document.createElement('canvas'); fly.className = 'fly'; fly.width = 120; fly.height = 180;
+  drawCover(fly.getContext('2d'), f, 120, 180);
+  fly.style.left = sx + 'px'; fly.style.top = sy + 'px'; fly.style.width = sw + 'px'; fly.style.height = sh + 'px';
+  document.getElementById('room').appendChild(fly);
+  const r = held.getBoundingClientRect(); const small = W < 640, pw = small ? 44 : 56, ph = small ? 64 : 82;
+  const tx = r.right - pw - (picks.length - 1) * (pw * 0.42), ty = r.bottom - ph;
+  const anim = fly.animate([
+    { transform: 'translate(0,0) rotate(0deg)', width: sw + 'px', height: sh + 'px', opacity: 1 },
+    { transform: 'translate(20px,-60px) rotate(-8deg)', width: (pw*1.4) + 'px', height: (ph*1.4) + 'px', offset: .4, opacity: 1 },
+    { transform: `translate(${tx - sx}px, ${ty - sy}px) rotate(0deg)`, width: pw + 'px', height: ph + 'px', opacity: 1 }
+  ], { duration: REDUCED ? 10 : 680, easing: 'cubic-bezier(.3,.9,.3,1)', fill: 'forwards' });
+  anim.onfinish = () => { fly.remove(); renderStack(); };
+  count.innerHTML = picks.length === 5 ? 'that’s <b>five</b>' : `<b>${WORDS[picks.length]}</b> more`;
+  if (picks.length === 5) setTimeout(closeCloset, 1300);
+}
+function renderStack() {
+  held.innerHTML = '';
+  const pw = W < 640 ? 44 : 56;
+  picks.forEach((f, k) => {
+    const d = document.createElement('div'); d.className = 'pick'; d.title = 'put it back';
+    const c = document.createElement('canvas'); c.width = 112; c.height = 164; drawCover(c.getContext('2d'), f, 112, 164);
+    const n = document.createElement('div'); n.className = 'n'; n.textContent = f.spine;
+    d.append(c, n);
+    d.style.right = (k * pw * 0.42) + 'px'; d.style.transform = `rotate(${(k - 2) * 3}deg)`; d.style.zIndex = k;
+    d.addEventListener('click', () => putBack(f));
+    held.appendChild(d);
+  });
+}
+function putBack(f) {
+  if (closing) return;
+  f.taken = false; picks = picks.filter(p => p !== f); renderStack(); draw();
+  count.innerHTML = picks.length ? `<b>${WORDS[picks.length]}</b> more` : 'pick <b>five</b>';
+}
+
+// ---------- closing ----------
+const light = document.getElementById('light'), reveal = document.getElementById('reveal'), five = document.getElementById('five');
+function closeCloset() {
+  closing = true; light.style.opacity = 1;
+  setTimeout(() => {
+    five.innerHTML = '';
+    picks.forEach(f => {
+      const w = document.createElement('div'); w.className = 'c';
+      const c = document.createElement('canvas'); c.width = 184; c.height = 276; drawCover(c.getContext('2d'), f, 184, 276); c.className = 'cov';
+      const k = document.createElement('div'); k.className = 'k'; k.textContent = 'No. ' + f.spine;
+      w.append(c, k); five.appendChild(w);
+    });
+    buildReveal();
+    reveal.scrollTop = 0; reveal.classList.add('on');
+    setTimeout(buildCounted, 50);
+  }, REDUCED ? 50 : 1500);
+}
+
+// ---------- the data part ----------
+const byS = () => Object.fromEntries(FILMS.map(f => [f.spine, f]));
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function coverEl(f, cls) { const c = document.createElement('canvas'); c.width = 184; c.height = 276; drawCover(c.getContext('2d'), f, 184, 276); c.className = cls || 'cov'; return c; }
+function pct(arr, v) { const a = arr.filter(x => x != null); return Math.round(100 * a.filter(x => x < v).length / a.length); }
+function median(a) { const b = a.filter(x => x != null).sort((x, y) => x - y); return b.length ? (b.length % 2 ? b[(b.length - 1) / 2] : (b[b.length / 2 - 1] + b[b.length / 2]) / 2) : null; }
+function listNames(names, max) { const n = names.slice(0, max); if (n.length === 1) return n[0]; const sep = n.some(x => / and |&/.test(x)) ? '; ' : ', '; return n.slice(0, -1).join(sep) + (sep === '; ' ? '; and ' : ' and ') + n[n.length - 1]; }
+
+function buildReveal() {
+  if (!RV) return;
+  const F = byS(), mine = picks.map(f => f.spine), mineSet = new Set(mine);
+
+  // 1. placed
+  const placed = document.getElementById('placed'); placed.innerHTML = '';
+  const firsts = picks.filter(f => f.picks === 0);
+  document.getElementById('placedL').textContent = firsts.length === 0 ? 'Every one of your five has left the closet before.' :
+    firsts.length === 5 ? 'None of your five has ever been taken. Nobody has stood where you are standing.' :
+    `${firsts.length === 1 ? 'One' : ['','','Two','Three','Four'][firsts.length]} of your five ${firsts.length === 1 ? 'has' : 'have'} never been taken out of the closet before.`;
+  picks.forEach(f => {
+    const row = el('div', 'pl'); row.appendChild(coverEl(f));
+    const r = el('div'); r.appendChild(el('div', 'k', 'No. ' + f.spine + (f.year ? ' · ' + f.year : ''))); r.appendChild(el('div', 't', f.title));
+    if (f.picks === 0) r.appendChild(el('div', 'first', 'You’re the first.'));
+    else { const w = el('div', 'who'); w.innerHTML = `Taken by <b>${f.picks}</b> guest${f.picks === 1 ? '' : 's'}: ${listNames(f.pickers, 4)}${f.picks > 4 ? ' and ' + (f.picks - 4) + ' more' : ''}.`; r.appendChild(w); }
+    row.appendChild(r); placed.appendChild(row);
+  });
+
+  // 2. twins: cosine on IDF-weighted binary vectors, over films anyone has picked
+  const idf = s => (RV.films[s] ? RV.films[s].idf : 0);
+  const myNorm = Math.sqrt(mine.reduce((a, s) => a + idf(s) ** 2, 0)) || 1;
+  const scored = RV.visits.map(v => {
+    const shared = v.spines.filter(s => mineSet.has(s));
+    const dot = shared.reduce((a, s) => a + idf(s) ** 2, 0);
+    const vn = Math.sqrt(v.spines.reduce((a, s) => a + idf(s) ** 2, 0)) || 1;
+    return { v, shared, sim: dot / (myNorm * vn) };
+  }).filter(x => x.shared.length).sort((a, b) => b.shared.length - a.shared.length || b.sim - a.sim);
+  const twins = document.getElementById('twins'); twins.innerHTML = '';
+  const most = scored.length ? scored[0].shared.length : 0, nMost = scored.filter(x => x.shared.length === most).length;
+  const WORD = ['none', 'one', 'two', 'three', 'four', 'five'];
+  document.getElementById('cornerL').textContent = !scored.length ?
+    'No guest has taken any of your five. In sixteen years of visits, nobody has stood in your corner.' :
+    `${scored.length} guest${scored.length === 1 ? '' : 's'} took at least one of your five. ${most === 1 ? 'None took more than one.' : `${nMost === 1 ? 'One' : nMost} took ${WORD[most]}; nobody took more.`} That is normal here: in sixteen years, no two visits have shared more than a handful of picks. This is a closet of moods, not tribes.`;
+  scored.slice(0, 3).forEach((x, k) => {
+    const card = el('div', 'tw'); card.appendChild(el('div', 'rank', String(k + 1)));
+    const r = el('div'); r.appendChild(el('div', 'n', x.v.guest));
+    const rare = x.shared.map(s => F[s]).filter(f => f && f.picks <= 3).length;
+    r.appendChild(el('div', 'd', `${x.v.date} · ${x.v.spines.length} picks · shares ${WORD[x.shared.length]} with you${rare ? (x.shared.length === 1 ? ', a film only ' + F[x.shared[0]].picks + ' guests have ever taken' : ', including ' + (rare === 1 ? 'one' : rare) + ' that few others have') : ''}`));
+    const shelf = el('div', 'shelf');
+    [...x.shared, ...x.v.spines.filter(s => !mineSet.has(s))].forEach(s => { const f = F[s]; if (f) shelf.appendChild(el('span', 'chip' + (mineSet.has(s) ? ' hit' : ''), f.title)); });
+    r.appendChild(shelf); card.appendChild(r); twins.appendChild(card);
+  });
+
+  // 3. map
+  drawMap(mine, scored.slice(0, 3).map(x => x.v));
+
+  // 4. four numbers
+  const yrs = picks.map(f => f.year).filter(Boolean), my = { medYear: median(yrs), us: picks.filter(f => (f.country || '').startsWith('United States')).length / 5, early: picks.filter(f => f.spine <= 200).length / 5, pop: picks.reduce((a, f) => a + f.picks, 0) / 5 };
+  const G = { medYear: RV.visits.map(v => v.medYear), us: RV.visits.map(v => v.us), early: RV.visits.map(v => v.early), pop: RV.visits.map(v => v.pop) };
+  const nums = document.getElementById('nums'); nums.innerHTML = '';
+  const add = (value, label, copy, p, gmed, lo, hi, v) => {
+    const d = el('div', 'num'); d.appendChild(el('div', 'v', value)); d.appendChild(el('div', 'l', label)); d.appendChild(el('div', 'c', copy));
+    const bar = el('div', 'bar'); const dot = el('i'); dot.style.left = (100 * (v - lo) / (hi - lo)) + '%'; const med = el('b'); med.style.left = (100 * (gmed - lo) / (hi - lo)) + '%'; med.title = 'guests’ median'; bar.append(med, dot); d.appendChild(bar);
+    nums.appendChild(d);
+  };
+  if (my.medYear) { const p = pct(G.medYear, my.medYear), gm = median(G.medYear); add(String(Math.round(my.medYear)), 'median year of your picks', p < 35 ? `Older than ${100 - p}% of guests. The typical visit centres on ${Math.round(gm)}.` : p > 65 ? `Newer than ${p}% of guests. The typical visit centres on ${Math.round(gm)}.` : `Right in the middle of the pack; guests centre on ${Math.round(gm)}.`, p, gm, 1930, 2015, my.medYear); }
+  { const p = pct(G.us, my.us), gm = median(G.us); add(`${Math.round(my.us * 5)} of 5`, 'American films', my.us === 0 ? 'Not one American film. Half of all picks in the closet are.' : my.us === 1 ? 'All American. Guests average about half.' : `Guests take about half American, half the rest of the world.`, p, gm, 0, 1, my.us); }
+  { const p = pct(G.early, my.early), gm = median(G.early); add(`${Math.round(my.early * 5)} of 5`, 'from the first 200 spines', my.early === 0 ? 'None from the original shelves. Most visits take one or two.' : `The early spines are the Laserdisc-era canon; guests take about ${Math.round(gm * 7)} in 7.`, p, gm, 0, 1, my.early); }
+  { const p = pct(G.pop, my.pop), gm = median(G.pop); add(my.pop.toFixed(1), 'guests per pick, on average', p < 30 ? `A contrarian shelf. ${100 - p}% of visits took more popular films than you.` : p > 70 ? (p >= 99 ? 'A consensus shelf. No visit on record took a more popular set.' : `A consensus shelf. Only ${100 - p}% of visits took more popular films.`) : `About as popular as the typical visit (median ${gm.toFixed(1)}).`, p, gm, 0, 14, Math.min(14, my.pop)); }
+
+  // 5. one to take with you
+  recommend(picks, scored);
+}
+
+function recommend(picks, scored) {
+  const F = byS(), mineSet = new Set(picks.map(f => f.spine)); const rec = document.getElementById('rec'), run = document.getElementById('runners'); rec.innerHTML = ''; run.innerHTML = '';
+  if (!RC) return;
+  // crowd: guests sharing a pick with you, and what else they took
+  const nb = scored, cnt = {}; nb.forEach(x => x.v.spines.forEach(s => { if (!mineSet.has(s)) cnt[s] = (cnt[s] || 0) + 1; }));
+  const mine = picks.map(f => ({ f, r: RC[f.spine] })).filter(x => x.r);
+  const cap = (name, max) => n => Math.min(n, max);
+  const inter = (a, b) => a.filter(x => b.includes(x));
+  const cos = (a, b) => a.reduce((t, v, i) => t + v * b[i], 0);
+  const cands = [];
+  for (const f of FILMS) {
+    if (mineSet.has(f.spine) || f.set || !f.cover) continue;
+    const r = RC[f.spine]; if (!r) continue;
+    let score = 0; const why = {};
+    const add = (key, w, film, data) => { const o = why[key] || (why[key] = { w: 0, films: [], ...data }); o.w += w; if (film && !o.films.includes(film)) o.films.push(film); };
+    // content, summed over your five
+    for (const { f: m, r: q } of mine) {
+      let c = 0;
+      const d = inter(r.dir, q.dir); if (d.length) { c += 1.0; add('dir:' + d[0], 1.0, m.title, { kind: 'dir', name: d[0] }); }
+      const dp = inter(r.dp, q.dp); if (dp.length) { c += 0.5; add('dp:' + dp[0], 0.5, m.title, { kind: 'dp', name: dp[0] }); }
+      const wr = inter(r.wr, q.wr).filter(x => !d.includes(x)); if (wr.length) { c += 0.4; add('wr:' + wr[0], 0.4, m.title, { kind: 'wr', name: wr[0] }); }
+      const mu = inter(r.mus, q.mus); if (mu.length) { c += 0.3; add('mus:' + mu[0], 0.3, m.title, { kind: 'mus', name: mu[0] }); }
+      const ca = inter(r.cast, q.cast); if (ca.length) { c += Math.min(0.6, 0.3 * ca.length); add('cast:' + ca[0], 0.3 * ca.length, m.title, { kind: 'cast', name: ca[0] }); }
+      let ctx = 0; const co = r.co && r.co === q.co, dec = r.dec && q.dec && r.dec === q.dec;
+      if (co) ctx += 0.3;
+      if (dec) ctx += 0.2; else if (r.dec && q.dec && Math.abs(r.dec - q.dec) === 10) ctx += 0.1;
+      if (r.lang && r.lang === q.lang) ctx += 0.1;
+      if (r.bw === q.bw) ctx += 0.1;
+      ctx += 0.5 * Math.max(0, cos(r.e, q.e));
+      c += ctx; if (co || dec) add('ctx:' + (co ? r.co : '') + ':' + (dec ? r.dec : ''), ctx, m.title, { kind: 'ctx', co: co ? r.co : null, dec: dec ? r.dec : null });
+      score += c;
+    }
+    // crowd
+    const k = cnt[f.spine] || 0;
+    if (k >= 2 && nb.length >= 5) { const base = (RV.films[f.spine] ? RV.films[f.spine].n : 0) / RV.N; const lift = base ? (k / nb.length) / base : 0; if (lift > 1.5) { const w = Math.min(1.5, 0.5 * Math.log(lift) + 0.15 * k); score += w; add('crowd', w, null, { kind: 'crowd', k, n: nb.length, lift }); } }
+    // a little track record
+    score += 0.15 * Math.log(1 + f.picks);
+    cands.push({ f, score, why: Object.values(why).sort((a, b) => b.w - a.w) });
+  }
+  cands.sort((a, b) => b.score - a.score);
+  if (!cands.length) return;
+  const top = cands[0];
+  // one film per director among the runners-up, so the list isn't three by the same hand
+  const seen = new Set([(RC[top.f.spine].dir[0] || '')]); const runners = [];
+  for (const c of cands.slice(1)) { const d0 = RC[c.f.spine].dir[0] || c.f.title; if (seen.has(d0)) continue; seen.add(d0); runners.push(c); if (runners.length === 2) break; }
+  const cov = coverEl(top.f); rec.appendChild(cov);
+  const r = el('div'); r.appendChild(el('div', 't', top.f.title));
+  r.appendChild(el('div', 'm', [top.f.director, top.f.year, top.f.country, 'No. ' + top.f.spine].filter(Boolean).join(' · ')));
+  rec.appendChild(r);
+  runners.forEach(c => { const d = el('div', 'ru'); d.appendChild(coverEl(c.f)); const t = el('div'); t.appendChild(el('div', 't', c.f.title)); t.appendChild(el('div', 'w', [c.f.director, c.f.year].filter(Boolean).join(' · '))); d.appendChild(t); run.appendChild(d); });
+}
+function cap0(s) { return s.replace(/(^|\s|-)([a-zà-ž])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bDe\b/g, 'de').replace(/\bVon\b/g, 'von').replace(/\bVan\b/g, 'van').replace(/\bDa\b/g, 'da'); }
+const THE = new Set(['united states', 'united kingdom', 'soviet union', 'netherlands', 'philippines', 'czech republic']);
+function place(co) { return THE.has(co.toLowerCase()) ? 'the ' + co : co; }
+function few(films) { if (films.length >= 3) return ['', '', '', 'three', 'four', 'all five'][films.length] + ' of your five'; return films.length === 1 ? films[0] : films.join(' and '); }
+const NUM = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
+function reason(o) {
+  switch (o.kind) {
+    case 'dir': return `Directed by ${cap0(o.name)}, who also directed ${few(o.films)}.`;
+    case 'dp': return `Shot by ${cap0(o.name)}, who also shot ${few(o.films)}.`;
+    case 'wr': return `Written by ${cap0(o.name)}, who also wrote ${few(o.films)}.`;
+    case 'mus': return `Scored by ${cap0(o.name)}, who also scored ${few(o.films)}.`;
+    case 'cast': return `${cap0(o.name)} is in it, as in ${few(o.films)}.`;
+    case 'ctx': return `It’s from ${o.co ? place(o.co) : ''}${o.co && o.dec ? ' in ' : ''}${o.dec ? 'the ' + o.dec + 's' : ''}, like ${few(o.films)}.`;
+    case 'crowd': return `${NUM[o.k] || o.k} of the ${o.n} guests in your corner took it, ${o.lift.toFixed(1)} times the usual rate.`;
+  }
+  return '';
+}
+
+function drawMap(mine, twins) {
+  const cv = document.getElementById('map'), r = cv.getBoundingClientRect(); cv.width = r.width * DPR; cv.height = r.height * DPR;
+  const g = cv.getContext('2d'); g.scale(DPR, DPR); const Wm = r.width, Hm = r.height, F = byS();
+  const regions = RV.regions, X0 = 1915, X1 = 2027, padL = Wm < 600 ? 90 : 150, padR = 16, padT = 30, padB = 56;
+  const sx = x => padL + (x - X0) / (X1 - X0) * (Wm - padL - padR), sy = y => padT + y / regions.length * (Hm - padT - padB);
+  g.clearRect(0, 0, Wm, Hm);
+  regions.forEach((name, i) => {
+    g.fillStyle = i % 2 ? 'rgba(243,234,219,.03)' : 'rgba(0,0,0,0)'; g.fillRect(padL, sy(i), Wm - padL - padR, sy(i + 1) - sy(i));
+    g.fillStyle = '#b8a898'; g.font = '13px "Montserrat", sans-serif'; g.textAlign = 'right'; g.textBaseline = 'middle';
+    let t = name; while (g.measureText(t).width > padL - 14 && t.length > 4) t = t.slice(0, -2);
+    g.fillText(t, padL - 10, sy(i + 0.5));
+  });
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  for (let y = 1920; y <= 2020; y += 20) { g.fillStyle = 'rgba(243,234,219,.08)'; g.fillRect(sx(y), padT, 1, Hm - padT - padB); g.fillStyle = '#b8a898'; g.fillText(String(y), sx(y), Hm - padB + 8); }
+  // every release: faint if never taken, a little brighter if it has been
+  for (const f of Object.values(RV.films)) { if (f.x == null) continue; g.fillStyle = f.n ? 'rgba(243,234,219,.26)' : 'rgba(243,234,219,.08)'; g.beginPath(); g.arc(sx(f.x), sy(f.y), 1.7, 0, 7); g.fill(); }
+  // the twins' shelves
+  const mineSet = new Set(mine);
+  twins.forEach(v => v.spines.forEach(s => { const f = RV.films[s]; if (!f || f.x == null || mineSet.has(s)) return; g.fillStyle = 'rgba(241,199,162,.85)'; g.beginPath(); g.arc(sx(f.x), sy(f.y), 3, 0, 7); g.fill(); }));
+  // your five, labelled
+  const pts = mine.map(s => [s, RV.films[s]]).filter(([s, f]) => f && f.x != null);
+  pts.forEach(([s, f]) => { g.fillStyle = '#f3eadb'; g.beginPath(); g.arc(sx(f.x), sy(f.y), 5.5, 0, 7); g.fill(); g.strokeStyle = '#1c1620'; g.lineWidth = 2; g.stroke(); });
+  g.font = '13px "Montserrat", sans-serif'; g.textBaseline = 'middle';
+  pts.forEach(([s, f]) => { const t = F[s].title, right = sx(f.x) < Wm - 140; g.textAlign = right ? 'left' : 'right'; const x = sx(f.x) + (right ? 9 : -9), y = sy(f.y) - 9;
+    g.lineWidth = 4; g.strokeStyle = '#2a292f'; g.strokeText(t, x, y); g.fillStyle = '#f3eadb'; g.fillText(t, x, y); });
+  // legend
+  g.textAlign = 'left'; g.font = '12px "Montserrat", sans-serif';
+  const lg = [['#f3eadb', 'your five'], ['rgba(241,199,162,.85)', 'your twins’ picks'], ['rgba(243,234,219,.26)', 'taken by someone'], ['rgba(243,234,219,.08)', 'never taken']];
+  let lx = padL + 8; lg.forEach(([c, t]) => { g.fillStyle = c; g.beginPath(); g.arc(lx + 4, Hm - 16, 3.5, 0, 7); g.fill(); g.fillStyle = '#b8a898'; g.fillText(t, lx + 12, Hm - 16); lx += g.measureText(t).width + 30; });
+  // the note: year and origin of your five, honestly
+  if (!pts.length) { document.getElementById('mapnote').textContent = 'Your picks have no year on record, so they cannot be placed.'; return; }
+  const yrs = pts.map(([s, f]) => f.x), lo = Math.min(...yrs), hi = Math.max(...yrs);
+  const regCount = {}; pts.forEach(([s, f]) => { const rname = regions[Math.min(regions.length - 1, Math.floor(f.y))]; regCount[rname] = (regCount[rname] || 0) + 1; });
+  const regs = Object.entries(regCount).sort((a, b) => b[1] - a[1]);
+  const span = hi - lo < 15 ? `all within ${hi - lo} years of each other` : `spread across ${hi - lo} years, ${Math.round(lo)} to ${Math.round(hi)}`;
+  const where = regs.length === 1 ? `all from ${regs[0][0]}` : `${regs[0][1]} from ${regs[0][0]}, ${regs.slice(1).map(([n, k]) => `${k} from ${n}`).join(', ')}`;
+  document.getElementById('mapnote').textContent = `Your five are ${span}; ${where}. The warm dots are where your three twins’ other picks sit.`;
+}
+document.getElementById('again').addEventListener('click', () => {
+  reveal.classList.remove('on'); light.style.opacity = 0; closing = false; reveal.scrollTop = 0;
+  picks.forEach(f => f.taken = false); picks = []; renderStack(); count.innerHTML = 'pick <b>five</b>'; draw();
+});
+
+
+// ---------- the whole closet, counted (below the personal reveal) ----------
+
+
+const C = { fg: '#f3eadb', dim: '#b8a898', acc: '#f1c7a2', ink: '#1c1620', card: '#2a292f', red: '#d8322a', blue: '#6fb3c7', grid: 'rgba(243,234,219,.08)' };
+const HAND = '"Montserrat", sans-serif';
+function hash_(n){ let x = (n * 2654435761) >>> 0; x ^= x >>> 15; x = (x * 2246822519) >>> 0; return (x ^ (x >>> 13)) >>> 0; }
+function rough(g, x, y, w, h, seed, fill, line) {
+  const j = k => (hash_(seed * 13 + k) % 100) / 100 - 0.5;
+  g.beginPath(); g.moveTo(x + j(1), y + j(2)); g.quadraticCurveTo(x + w/2, y + j(3)*1.5, x + w + j(4), y + j(5));
+  g.quadraticCurveTo(x + w + j(6)*1.5, y + h/2, x + w + j(7), y + h + j(8)); g.quadraticCurveTo(x + w/2, y + h + j(9)*1.5, x + j(10), y + h + j(11));
+  g.quadraticCurveTo(x + j(12)*1.5, y + h/2, x + j(1), y + j(2)); g.closePath(); g.fillStyle = fill; g.fill();
+  if (line) { g.strokeStyle = line; g.lineWidth = 1.6; g.lineJoin = 'round'; g.stroke(); }
+}
+function setup(id) { const cv = document.getElementById(id), r = cv.getBoundingClientRect(); const h = +cv.getAttribute('height'); cv.width = r.width * DPR; cv.height = h * DPR; cv.style.height = h + 'px'; const g = cv.getContext('2d'); g.scale(DPR, DPR); return { cv, g, W: r.width, H: h }; }
+const tip = document.getElementById('tip');
+function showTip(e, html) { tip.innerHTML = html; tip.style.display = 'block'; tip.style.left = Math.min(innerWidth - 280, e.clientX + 14) + 'px'; tip.style.top = (e.clientY + 14) + 'px'; }
+function hideTip() { tip.style.display = 'none'; }
+function warm(t) { if (t >= 0) { const a = Math.min(1, t); return `rgba(241,160,110,${0.15 + 0.75 * a})`; } const a = Math.min(1, -t); return `rgba(111,179,199,${0.15 + 0.75 * a})`; }
+const fewList = a => a.length === 1 ? a[0] : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+
+
+let COUNTED_DONE = false;
+function buildCounted() {
+  if (COUNTED_DONE) return; COUNTED_DONE = true;
+  fetch('findings.json').then(r => r.json()).then(F => {
+  const H = F.head;
+  document.getElementById('hPicks').textContent = H.picks.toLocaleString(); document.getElementById('hTop2').textContent = H.top20_share;
+  for (const [id, v] of [['mVisits', H.visits], ['mFirst', H.first_date], ['mLast', H.last_date], ['mAhead', H.ahead_of_shelf], ['mPairs', H.pairs_total.toLocaleString()], ['mPairs2', H.pairs_sharing_2]]) document.getElementById(id).textContent = v;
+  document.getElementById('big').innerHTML = [[H.visits, 'visits'], [H.picks.toLocaleString(), 'picks'], [H.distinct, 'different films taken'], [Math.round(100 * (H.standalone - H.never_standalone) / H.standalone) + '%', 'of standalone releases taken at least once'], [H.once, 'films taken exactly once'], [H.top20_share + '%', 'of picks go to the top twenty films']].map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('');
+
+  // 1. the shelf: share of picks by popularity rank band
+  {
+    document.getElementById('hPicks3').textContent = H.picks.toLocaleString();
+    const S = F.strip.filter(x => x.n > 0).sort((a, b) => b.n - a.n), tot = S.reduce((a, x) => a + x.n, 0);
+    const cum = []; let run = 0; S.forEach(x => { run += x.n; cum.push(run / tot * 100); });
+    const share = k => cum[k - 1], half = cum.findIndex(v => v >= 50) + 1;
+    const never = F.strip.filter(x => !x.n && !x.inset && !x.set).length, N = S.length, NX = N + never;
+    const { cv, g, W } = setup('bands'); const Hc = 320, padL = 44, padR = 16, padB = 44, padT = 26, PW = W - padL - padR, PH = Hc - padT - padB;
+    const sx = k => padL + PW * k / NX, sy = v => padT + PH * (1 - v / 100);
+    [25, 50, 75, 100].forEach(v => { g.fillStyle = C.grid; g.fillRect(padL, sy(v), PW, 1); g.fillStyle = C.dim; g.font = `10.5px ${HAND}`; g.textAlign = 'right'; g.fillText(v + '%', padL - 6, sy(v) + 4); });
+    g.textAlign = 'center'; for (let k = 0; k <= NX; k += 200) { g.fillStyle = C.grid; g.fillRect(sx(k), padT, 1, PH); g.fillStyle = C.dim; g.fillText(k, sx(k), Hc - padB + 16); }
+    g.textAlign = 'left'; g.fillText('share of all picks, films ranked from most to least taken', padL + 6, padT - 10);
+    g.textAlign = 'right'; g.fillText('films, in order of popularity →', padL + PW, Hc - 6);
+    // equal-share reference
+    g.save(); g.setLineDash([3, 5]); g.strokeStyle = 'rgba(243,234,219,.3)'; g.lineWidth = 1; g.beginPath(); g.moveTo(sx(0), sy(0)); g.lineTo(sx(N), sy(100)); g.stroke(); g.restore();
+    // the curve, with a hand wobble
+    const wob = k => Math.sin(k * 1.7) * 0.7 + Math.sin(k * 0.31) * 0.5;
+    g.strokeStyle = C.acc; g.lineWidth = 2.2; g.lineJoin = 'round'; g.beginPath(); g.moveTo(sx(0), sy(0));
+    for (let k = 1; k <= N; k++) g.lineTo(sx(k) + wob(k), sy(cum[k - 1]) + wob(k + 9)); g.stroke();
+    // red tail: never taken
+    g.strokeStyle = C.red; g.lineWidth = 3; g.beginPath(); g.moveTo(sx(N), sy(100)); for (let k = N; k <= NX; k += 4) g.lineTo(sx(k), sy(100) + wob(k)); g.lineTo(sx(NX), sy(100)); g.stroke();
+    g.fillStyle = C.red; g.font = `11px ${HAND}`; g.textAlign = 'right'; g.fillText(`${never} standalone releases never taken`, sx(NX) - 2, sy(100) + 16);
+    // annotations
+    const marks = [[20, 'top 20', 1], [100, 'top 100', 1], [half, 'half of all picks', 1], [400, 'top 400', 1]];
+    marks.forEach(([k, label, _]) => { const x = sx(k), y = sy(share(k)); g.fillStyle = C.acc; g.beginPath(); g.arc(x, y, 3.5, 0, 7); g.fill(); g.fillStyle = C.ink; g.beginPath(); g.arc(x, y, 1.5, 0, 7); g.fill();
+      g.textAlign = 'left'; g.fillStyle = C.fg; g.font = `11px ${HAND}`; g.fillText(label === 'half of all picks' ? `${k} films → half of all picks` : `${label} → ${Math.round(share(k))}%`, x + 10, y + 14); });
+    cv.addEventListener('mousemove', e => { const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+      if (mx < padL || mx > padL + PW || my < padT || my > Hc - padB) return hideTip();
+      const k = Math.max(1, Math.min(NX, Math.round((mx - padL) / PW * NX)));
+      k <= N ? showTip(e, `Top ${k} films<small>${share(k).toFixed(1)}% of all picks · rank ${k} is ${S[k - 1].t} (${S[k - 1].n} visit${S[k - 1].n === 1 ? '' : 's'})</small>`) : showTip(e, `Never taken<small>${never} standalone releases have not left the room</small>`); });
+    cv.addEventListener('mouseleave', hideTip);
+    const lastRank = S.reduce((t, x) => t + (x.n <= 3 ? 1 : 0), 0);
+    document.getElementById('bandText').textContent = `The curve bends, but it never spikes. The twenty most-taken films, led by ${S[0].t} at ${S[0].n} visits, are ${share(20).toFixed(1)}% of everything taken. The top hundred are ${Math.round(share(100))}%. It takes ${half} different films to reach half of all picks. The ${lastRank} films at the bottom of the ranking, each taken one to three times, add up to ${(100 - share(N - lastRank)).toFixed(1)}% of picks: more than the top twenty. ${F.head.once} films have been taken exactly once. The median film taken has been taken ${S[Math.floor(N / 2)].n} times.`;
+    const first100 = F.strip.filter(x => x.s <= 100 && !x.inset && !x.set), never100 = first100.filter(x => !x.n);
+    document.getElementById('stripText').textContent = `Then the curve runs flat and red. ${never} standalone releases, a quarter of the shelf, have never left the room. They aren't only the new ones. Of the first hundred spines, Criterion's Laserdisc-era canon, ${never100.length} have never been taken, among them ${fewList(never100.slice(0, 6).map(x => x.t))}.`;
+  }
+
+  // 2–3. grids
+  const countries = ['United States', 'France', 'Japan', 'Italy', 'United Kingdom', 'Germany', 'Sweden', 'Soviet Union', 'Mexico', 'Canada', 'Poland', 'Hong Kong'];
+  const decades = [1920, 1930, 1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
+  function gridChart(id, cellFn) {
+    const { cv, g, W } = setup(id); const Hc = 360, padL = W < 600 ? 90 : 118, padT = 28, padB = 10, cw = (W - padL - 12) / decades.length, ch = (Hc - padT - padB) / countries.length;
+    g.font = `10px ${HAND}`; g.fillStyle = C.dim; g.textAlign = 'center'; decades.forEach((d, j) => g.fillText(d + 's', padL + (j + 0.5) * cw, padT - 10));
+    const cells = [];
+    countries.forEach((c, i) => { g.textAlign = 'right'; g.fillStyle = C.dim; g.font = `10px ${HAND}`; let t = c; while (g.measureText(t).width > padL - 12 && t.length > 4) t = t.slice(0, -2); g.fillText(t, padL - 8, padT + (i + 0.5) * ch + 4);
+      decades.forEach((d, j) => { const v = cellFn(c, d); const x = padL + j * cw + 2, y = padT + i * ch + 2; if (!v) { g.fillStyle = 'rgba(243,234,219,.03)'; g.fillRect(x, y, cw - 4, ch - 4); return; }
+        rough(g, x, y, cw - 4, ch - 4, i * 31 + j, v.fill, 'rgba(28,22,32,.6)'); if (v.label && cw > 34) { g.fillStyle = v.dark ? C.ink : C.fg; g.textAlign = 'center'; g.font = `10.5px ${HAND}`; g.fillText(v.label, x + (cw - 4) / 2, y + (ch - 4) / 2 + 4); }
+        cells.push({ x, y, w: cw - 4, h: ch - 4, tip: v.tip }); }); });
+    cv.addEventListener('mousemove', e => { const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top; const c = cells.find(k => mx >= k.x && mx <= k.x + k.w && my >= k.y && my <= k.y + k.h); c ? showTip(e, c.tip) : hideTip(); });
+    cv.addEventListener('mouseleave', hideTip);
+  }
+  const maxCount = Math.max(...countries.map(c => Math.max(...decades.map(d => F.coll_grid[c] ? F.coll_grid[c][d] || 0 : 0))));
+  gridChart('gridA', (c, d) => { const n = F.coll_grid[c] ? F.coll_grid[c][d] || 0 : 0; if (!n) return null; const a = Math.sqrt(n / maxCount); return { fill: `rgba(243,234,219,${0.08 + 0.8 * a})`, label: String(n), dark: a > 0.45, tip: `${c}, ${d}s<small>${n} release${n === 1 ? '' : 's'} in the collection</small>` }; });
+  const cellMap = {}; F.grid.cells.forEach(([c, d, o, e, r]) => cellMap[c + d] = { o, e, r });
+  gridChart('gridB', (c, d) => { const v = cellMap[c + d]; if (!v) return null; return { fill: warm(Math.log2(v.r) / 1.4), label: v.r.toFixed(2) + '×', dark: v.r > 1.6 || v.r < 0.55, tip: `${c}, ${d}s<small>${v.o} picks, ${v.e} expected from the shelf · ${v.r}×</small>` }; });
+  { const cs = F.grid.cells.filter(x => x[3] >= 20).sort((a, b) => a[4] - b[4]); const lo = cs.slice(0, 4), hi = cs.slice(-4).reverse(); const cr = c => (F.grid.country[c][0] / F.grid.country[c][1]).toFixed(2);
+    document.getElementById('gridText').textContent = `The most under-taken cells with real weight behind them: ${fewList(lo.map(x => `${x[0]} in the ${x[1]}s (${x[4]}×)`))}. The most over-taken: ${fewList(hi.map(x => `${x[0]} in the ${x[1]}s (${x[4]}×)`))}. Country by country, against the shelf as it stood: American films are taken at ${cr('United States')}× their share, French at ${cr('France')}×, Japanese at ${cr('Japan')}×, Swedish at ${cr('Sweden')}×.`; }
+
+  // 5. directors
+  {
+    const { cv, g, W } = setup('dirs'); const Hc = 420, padL = 44, padB = 36, padT = 16, padR = 16, D = F.directors;
+    const maxX = Math.max(...D.map(d => d[2])) + 1, maxY = Math.max(...D.map(d => d[1])) + 4;
+    const sx = v => padL + (v / maxX) * (W - padL - padR), sy = v => padT + (Hc - padT - padB) * (1 - v / maxY);
+    for (let v = 10; v < maxY; v += 10) { g.fillStyle = C.grid; g.fillRect(padL, sy(v), W - padL - padR, 1); g.fillStyle = C.dim; g.font = `10.5px ${HAND}`; g.textAlign = 'right'; g.fillText(v, padL - 6, sy(v) + 4); }
+    for (let v = 2; v < maxX; v += 2) { g.fillStyle = C.grid; g.fillRect(sx(v), padT, 1, Hc - padT - padB); g.fillStyle = C.dim; g.textAlign = 'center'; g.fillText(v, sx(v), Hc - 14); }
+    g.fillStyle = C.dim; g.textAlign = 'right'; g.fillText('different titles taken →', W - padR - 4, Hc - 30); g.save(); g.translate(14, padT + 120); g.rotate(-Math.PI / 2); g.textAlign = 'left'; g.fillText('picks →', 0, 0); g.restore();
+    const pts = [];
+    D.forEach((d, i) => { const x = sx(d[2]) + ((hash_(i) % 7) - 3), y = sy(d[1]); const big = d[1] >= 28; g.fillStyle = big ? C.acc : 'rgba(243,234,219,.6)'; g.beginPath(); g.arc(x, y, big ? 5.5 : 4, 0, 7); g.fill(); g.strokeStyle = C.ink; g.lineWidth = 1.5; g.stroke(); pts.push({ x, y, d });
+      if (d[1] >= 42 || d[2] >= 12 || (d[1] / d[2] >= 10 && d[1] >= 20)) { g.fillStyle = C.fg; g.font = `10px ${HAND}`; g.textAlign = x > W - 150 ? 'right' : 'left'; g.fillText(d[0].replace('Michael Powell and Emeric Pressburger', 'Powell & Pressburger'), x + (x > W - 150 ? -9 : 9), y + 4); } });
+    cv.addEventListener('mousemove', e => { const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top; const p = pts.find(k => Math.hypot(k.x - mx, k.y - my) < 8); p ? showTip(e, `${p.d[0]}<small>${p.d[1]} picks across ${p.d[2]} title${p.d[2] === 1 ? '' : 's'}</small>`) : hideTip(); });
+    cv.addEventListener('mouseleave', hideTip);
+  }
+
+  // 6. people
+  const list = (id, rows, fmt) => document.getElementById(id).innerHTML = rows.map(fmt).join('');
+  list('actors', F.people.actors, r => `<div>${r[0]}<span>${r[3]} visits · ${r[2]} of ${r[1]} releases</span></div>`);
+  list('dps', F.people.dps, r => `<div>${r[0]}<span>${r[3]} visits · ${r[2]} of ${r[1]}</span></div>`);
+  list('dpsRare', F.people.dps_rare, r => `<div>${r[0]}<span>${r[2]} of ${r[1]} releases taken</span></div>`);
+  list('teams', F.people.teams, r => `<div><div>${r[0]} <span class="m">&amp; ${r[1]}</span></div><span>${r[3]} visits · ${r[2]} films</span></div>`);
+
+  // 7. fair leaderboard + top 20
+  document.getElementById('fair').innerHTML = '<tr><th>by picks per 100 exposed visits</th><th class="n">year</th><th class="n">rate</th></tr>' + F.fair.map(r => `<tr class="${r[7] ? 'up' : ''}"><td>${r[1]}</td><td class="n">${r[3] || ''}</td><td class="n">${r[6].toFixed(1)}</td></tr>`).join('');
+  document.getElementById('top').innerHTML = F.top.map(([s, t, d, y, n]) => `<div><img src="covers_small/${String(s).padStart(4, '0')}.jpg" alt="" loading="lazy"><div class="t">${t}</div><div class="k">${n} visits</div></div>`).join('');
+
+  // 8. pick order, neighbors, vanity
+  {
+    const { g, W } = setup('order'); const Hc = 250, padL = 44, padB = 34, padT = 22, P = F.pickorder, n = P.length, gw = (W - padL - 12) / n, lo = 5, hi = 7.2;
+    const sy = v => padT + (Hc - padT - padB) * (1 - (v - lo) / (hi - lo));
+    [5.5, 6, 6.5, 7].forEach(v => { g.fillStyle = C.grid; g.fillRect(padL, sy(v), W - padL - 12, 1); g.fillStyle = C.dim; g.font = `10.5px ${HAND}`; g.textAlign = 'right'; g.fillText(v.toFixed(1), padL - 6, sy(v) + 4); });
+    P.forEach((r, i) => { const x = padL + i * gw + 8, bw = gw - 16; rough(g, x, sy(r[1]), bw, (Hc - padB) - sy(r[1]), i * 5, i === 0 ? C.acc : 'rgba(243,234,219,.5)', 'rgba(28,22,32,.7)');
+      g.fillStyle = C.dim; g.font = `10.5px ${HAND}`; g.textAlign = 'center'; g.fillText(['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth'][r[0] - 1], x + bw / 2, Hc - 12); g.fillStyle = C.fg; g.fillText(r[1].toFixed(1), x + bw / 2, sy(r[1]) - 6); g.fillStyle = C.dim; g.fillText(Math.round(r[2]), x + bw / 2, sy(r[1]) + 16); });
+    g.fillStyle = C.dim; g.textAlign = 'left'; g.fillText('other visits that also took the film (mean); mean film year below', padL + 6, padT - 6);
+    const nb = F.neighbors; document.getElementById('neighText').textContent = `Guests also reach for what sits next to what they came for. Across all visits there are ${nb.observed} pairs of picks within three spine numbers of each other. Random draws from the shelf give ${nb.random_mean} (± ${nb.random_sd}).`;
+  }
+  document.getElementById('vanH').textContent = `${F.vanity.length} picks where the guest is in the film`;
+  document.getElementById('van').innerHTML = F.vanity.map(v => `<div>${v.guest} <span>took</span> ${v.title}</div>`).join('');
+
+  // 9. drift
+  {
+    const { cv, g, W } = setup('drift'); const Hc = 260, padL = 44, padB = 34, padT = 22, padR = 16, D = F.drift.filter(d => d[1] >= 20);
+    const years = D.map(d => d[0]), y0 = years[0], y1 = years[years.length - 1];
+    const sx = y => padL + (y - y0) / (y1 - y0) * (W - padL - padR), sy = v => padT + (Hc - padT - padB) * (1 - v / 0.7);
+    [0.2, 0.4, 0.6].forEach(v => { g.fillStyle = C.grid; g.fillRect(padL, sy(v), W - padL - padR, 1); g.fillStyle = C.dim; g.font = `10.5px ${HAND}`; g.textAlign = 'right'; g.fillText(Math.round(v * 100) + '%', padL - 6, sy(v) + 4); });
+    years.forEach(y => { if (y % 2 === 0) { g.fillStyle = C.dim; g.textAlign = 'center'; g.fillText(y, sx(y), Hc - 12); } });
+    const line = (idx, color, w) => { g.strokeStyle = color; g.lineWidth = w; g.lineJoin = 'round'; g.beginPath(); D.forEach((d, i) => i ? g.lineTo(sx(d[0]), sy(d[idx])) : g.moveTo(sx(d[0]), sy(d[idx]))); g.stroke(); D.forEach(d => { g.fillStyle = color; g.beginPath(); g.arc(sx(d[0]), sy(d[idx]), 3.5, 0, 7); g.fill(); }); };
+    line(3, 'rgba(243,234,219,.45)', 2); line(2, C.acc, 2.5);
+    g.textAlign = 'left'; g.fillStyle = C.acc; g.fillText('American share of picks', padL + 6, padT + 2); g.fillStyle = 'rgba(243,234,219,.6)'; g.fillText('American share of the shelf', padL + 180, padT + 2);
+    cv.addEventListener('mousemove', e => { const r = cv.getBoundingClientRect(); const yr = Math.round(y0 + (e.clientX - r.left - padL) / (W - padL - padR) * (y1 - y0)); const d = D.find(x => x[0] === yr); d ? showTip(e, `${d[0]}<small>${d[1]} picks · ${Math.round(d[2] * 100)}% American vs ${Math.round(d[3] * 100)}% of the shelf</small>`) : hideTip(); });
+    cv.addEventListener('mouseleave', hideTip);
+  }
+
+  // 10. runtime
+  {
+    const { g, W } = setup('rt'); const Hc = 220, padL = 10, padB = 30, padT = 24, R = F.runtime, n = R.labels.length, gw = (W - 20) / n, maxV = 50;
+    const sy = v => padT + (Hc - padT - padB) * (1 - v / maxV);
+    R.labels.forEach((l, i) => { const x0 = padL + i * gw + 6, bw = (gw - 12) / 2; rough(g, x0, sy(R.shelf[i]), bw - 2, (Hc - padB) - sy(R.shelf[i]), i * 3, 'rgba(243,234,219,.3)', 'rgba(28,22,32,.7)'); rough(g, x0 + bw, sy(R.picks[i]), bw - 2, (Hc - padB) - sy(R.picks[i]), i * 3 + 1, C.acc, 'rgba(28,22,32,.7)');
+      g.fillStyle = C.dim; g.font = `10px ${HAND}`; g.textAlign = 'center'; g.fillText(l + ' min', x0 + bw, Hc - 10); });
+    g.textAlign = 'left'; g.fillStyle = 'rgba(243,234,219,.3)'; g.fillRect(padL + 4, 6, 12, 12); g.fillStyle = C.dim; g.fillText('shelf', padL + 20, 16); g.fillStyle = C.acc; g.fillRect(padL + 60, 6, 12, 12); g.fillStyle = C.dim; g.fillText('picks', padL + 76, 16);
+    document.getElementById('rtText').textContent = `Under 90 minutes: ${R.shelf[0]}% of the shelf, ${R.picks[0]}% of picks. Over 130 minutes: ${(R.shelf[3] + R.shelf[4]).toFixed(1)}% of the shelf, ${(R.picks[3] + R.picks[4]).toFixed(1)}% of picks. Black-and-white: ${R.bw[1]}% of the shelf, ${R.bw[0]}% of picks.`;
+  }
+
+  });
+}
+
+// ---------- boot ----------
+let RV = null;
+let RC = null;
+fetch('reveal.json').then(r => r.json()).then(d => { RV = d; });
+fetch('recs.json').then(r => r.json()).then(d => { RC = d; });
+fetch('films.json').then(r => r.json()).then(data => {
+  FILMS = data.filter(f => f.spine).sort((a, b) => a.spine - b.spine);
+  placeFilms();
+  addEventListener('resize', layout);
+  layout();
+  document.getElementById('loading').classList.add('off');
+  document.fonts && document.fonts.ready.then(() => { sprites.clear(); draw(); });
+}).catch(e => { document.getElementById('loading').textContent = 'Could not load films.json. Serve this folder over http (python -m http.server) rather than opening the file directly.'; });
+</script>
+</body>
+</html>
