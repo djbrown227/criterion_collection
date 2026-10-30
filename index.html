@@ -975,7 +975,7 @@ function buildCounted() {
   fetch('findings.json').then(r => r.json()).then(F => {
   const H = F.head;
   document.getElementById('hPicks').textContent = H.picks.toLocaleString(); document.getElementById('hTop2').textContent = H.top20_share;
-  for (const [id, v] of [['mVisits', H.visits], ['mFirst', H.first_date], ['mLast', H.last_date], ['mAhead', H.ahead_of_shelf], ['mPairs', H.pairs_total.toLocaleString()], ['mPairs2', H.pairs_sharing_2]]) document.getElementById(id).textContent = v;
+  for (const [id, v] of [['mVisits', H.visits], ['mFirst', H.first_date], ['mLast', H.last_date], ['mAhead', H.ahead_of_shelf], ['mPairs', H.pairs_total.toLocaleString()], ['mPairs2', H.pairs_sharing_2]]) { const el = document.getElementById(id); if (el) el.textContent = v; }
   document.getElementById('big').innerHTML = [[H.visits, 'visits'], [H.picks.toLocaleString(), 'picks'], [H.distinct, 'different films taken'], [Math.round(100 * (H.standalone - H.never_standalone) / H.standalone) + '%', 'of standalone releases taken at least once'], [H.once, 'films taken exactly once'], [H.top20_share + '%', 'of picks go to the top twenty films']].map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('');
 
   // 1. the shelf: share of picks by popularity rank band
